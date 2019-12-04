@@ -517,8 +517,8 @@ void advanced_spgemm(std::shared_ptr<const CudaExecutor> exec,
         auto info = cusparse::create_spgemm_info();
 
         ValueType valpha{};
-        exec->get_master()->copy_from(exec.get(), 1, alpha->get_const_values(),
-                                      &valpha);
+        exec->get_master()->get_mem_space()->copy_from(
+            exec->get_mem_space().get(), 1, alpha->get_const_values(), &valpha);
         auto a_nnz = IndexType(a->get_num_stored_elements());
         auto a_vals = a->get_const_values();
         auto a_row_ptrs = a->get_const_row_ptrs();
@@ -528,8 +528,8 @@ void advanced_spgemm(std::shared_ptr<const CudaExecutor> exec,
         auto b_row_ptrs = b->get_const_row_ptrs();
         auto b_col_idxs = b->get_const_col_idxs();
         ValueType vbeta{};
-        exec->get_master()->copy_from(exec.get(), 1, beta->get_const_values(),
-                                      &vbeta);
+        exec->get_master()->get_mem_space()->copy_from(
+            exec->get_mem_space().get(), 1, beta->get_const_values(), &vbeta);
         auto d_nnz = IndexType(d->get_num_stored_elements());
         auto d_vals = d->get_const_values();
         auto d_row_ptrs = d->get_const_row_ptrs();
@@ -983,7 +983,8 @@ void sort_by_column_index(std::shared_ptr<const CudaExecutor> exec,
 
         // copy values
         Array<ValueType> tmp_vals_array(exec, nnz);
-        exec->copy_from(exec.get(), nnz, vals, tmp_vals_array.get_data());
+        exec->get_mem_space()->copy_from(exec->get_mem_space().get(), nnz, vals,
+                                         tmp_vals_array.get_data());
         auto tmp_vals = tmp_vals_array.get_const_data();
 
         // init identity permutation
