@@ -1,0 +1,3 @@
+add_executable(whole_matrix_gmres whole_matrix_gmres.cpp)
+target_link_libraries(whole_matrix_gmres ginkgo)
+target_include_directories(whole_matrix_gmres PRIVATE ${PROJECT_SOURCE_DIR})
