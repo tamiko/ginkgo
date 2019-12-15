@@ -102,6 +102,15 @@ GKO_DECLARE_ALL_AS_TEMPLATES;
 }  // namespace omp
 
 
+namespace mpi {
+namespace ell {
+
+GKO_DECLARE_ALL_AS_TEMPLATES;
+
+}  // namespace ell
+}  // namespace mpi
+
+
 namespace cuda {
 namespace ell {
 

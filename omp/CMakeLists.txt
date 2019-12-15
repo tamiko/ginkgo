@@ -48,6 +48,9 @@ if (GINKGO_HAVE_METIS)
   target_link_libraries(ginkgo_omp PRIVATE METIS::METIS)
 endif()
 
+# Need to link against ginkgo_mpi for the `raw_copy_to(MpiExecutor ...)` method
+target_link_libraries(ginkgo_omp PUBLIC ginkgo_mpi)
+
 ginkgo_default_includes(ginkgo_omp)
 ginkgo_install_library(ginkgo_omp omp)
 
