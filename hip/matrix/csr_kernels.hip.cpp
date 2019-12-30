@@ -652,10 +652,10 @@ void advanced_spgemm(std::shared_ptr<const HipExecutor> exec,
 
         ValueType valpha{};
         ValueType vbeta{};
-        exec->get_master()->copy_from(exec.get(), 1, alpha->get_const_values(),
-                                      &valpha);
-        exec->get_master()->copy_from(exec.get(), 1, beta->get_const_values(),
-                                      &vbeta);
+        exec->get_master()->get_mem_space()->copy_from(
+            exec->get_mem_space().get(), 1, alpha->get_const_values(), &valpha);
+        exec->get_master()->get_mem_space()->copy_from(
+            exec->get_mem_space().get(), 1, beta->get_const_values(), &vbeta);
         auto total_nnz = c_nnz + d->get_num_stored_elements();
         auto nnz_per_row = total_nnz / m;
         select_spgeam(spgeam_kernels(),
@@ -1094,7 +1094,8 @@ void sort_by_column_index(std::shared_ptr<const HipExecutor> exec,
 
         // copy values
         Array<ValueType> tmp_vals_array(exec, nnz);
-        exec->copy_from(exec.get(), nnz, vals, tmp_vals_array.get_data());
+        exec->get_mem_space()->copy_from(exec->get_mem_space().get(), nnz, vals,
+                                         tmp_vals_array.get_data());
         auto tmp_vals = tmp_vals_array.get_const_data();
 
         // init identity permutation
