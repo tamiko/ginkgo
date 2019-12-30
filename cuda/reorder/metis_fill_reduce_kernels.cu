@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2020, the Ginkgo authors
+Copyright (c) 2017-2019, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,61 +30,43 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#ifndef GKO_INCLUDE_CONFIG_H
-#define GKO_INCLUDE_CONFIG_H
+#include "core/reorder/metis_fill_reduce_kernels.hpp"
 
-// clang-format off
-#define GKO_VERSION_MAJOR @Ginkgo_VERSION_MAJOR@
-#define GKO_VERSION_MINOR @Ginkgo_VERSION_MINOR@
-#define GKO_VERSION_PATCH @Ginkgo_VERSION_PATCH@
-#define GKO_VERSION_TAG "@Ginkgo_VERSION_TAG@"
-#define GKO_VERSION_STR @Ginkgo_VERSION_MAJOR@, @Ginkgo_VERSION_MINOR@, @Ginkgo_VERSION_PATCH@
-// clang-format on
 
-/*
- * Controls the amount of messages output by Ginkgo.
- * 0 disables all output (except for test, benchmarks and examples).
- * 1 activates important messages.
+#include <ginkgo/core/base/array.hpp>
+#include <ginkgo/core/base/metis_types.hpp>
+#include <ginkgo/core/base/std_extensions.hpp>
+#include <ginkgo/core/base/types.hpp>
+#include <ginkgo/core/matrix/csr.hpp>
+#include <ginkgo/core/matrix/permutation.hpp>
+#include <ginkgo/core/matrix/sparsity_csr.hpp>
+
+
+namespace gko {
+namespace kernels {
+namespace cuda {
+/**
+ * @brief The Metis fill reduce ordering namespace
+ *
+ * @ingroup reorder
  */
-// clang-format off
-#define GKO_VERBOSE_LEVEL @GINKGO_VERBOSE_LEVEL@
-// clang-format on
-
-// clang-format off
-#define GKO_HWLOC_XMLFILE "@HWLOC_XMLFILE@"
-// clang-format on
-
-/* Is Itanium ABI available? */
-#cmakedefine GKO_HAVE_CXXABI_H
+namespace metis_fill_reduce {
 
 
-/* Should we use all optimizations for Jacobi? */
-#cmakedefine GINKGO_JACOBI_FULL_OPTIMIZATIONS
+template <typename ValueType, typename IndexType>
+void get_permutation(
+    std::shared_ptr<const CudaExecutor> exec, size_type num_vertices,
+    std::shared_ptr<matrix::SparsityCsr<ValueType, IndexType>> adjacency_matrix,
+    std::shared_ptr<Array<IndexType>> vertex_weights,
+    std::shared_ptr<matrix::Permutation<IndexType>> permutation_mat,
+    std::shared_ptr<matrix::Permutation<IndexType>> inv_permutation_mat)
+    GKO_NOT_IMPLEMENTED;
 
-/* Is HWLOC available for obtaining the machine_info? */
-// clang-format off
-#define GKO_HAVE_HWLOC @GINKGO_HAVE_HWLOC@
-// clang-format on
-
-/* What is HIP compiled for, hcc or nvcc? */
-// clang-format off
-#define GINKGO_HIP_PLATFORM_HCC @GINKGO_HIP_PLATFORM_HCC@
-
-
-#define GINKGO_HIP_PLATFORM_NVCC @GINKGO_HIP_PLATFORM_NVCC@
-// clang-format on
+GKO_INSTANTIATE_FOR_EACH_VALUE_AND_METIS_INDEX_TYPE(
+    GKO_DECLARE_METIS_FILL_REDUCE_GET_PERMUTATION_KERNEL);
 
 
-/* Is PAPI SDE available for Logging? */
-// clang-format off
-#define GKO_HAVE_PAPI_SDE @GINKGO_HAVE_PAPI_SDE@
-// clang-format on
-
-
-/* Is Metis available */
-// clang-format off
-#define GKO_HAVE_METIS @GINKGO_HAVE_METIS@
-// clang-format on
-
-
-#endif  // GKO_INCLUDE_CONFIG_H
+}  // namespace metis_fill_reduce
+}  // namespace cuda
+}  // namespace kernels
+}  // namespace gko

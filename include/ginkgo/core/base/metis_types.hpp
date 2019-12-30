@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2020, the Ginkgo authors
+Copyright (c) 2017-2019, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,61 +30,63 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#ifndef GKO_INCLUDE_CONFIG_H
-#define GKO_INCLUDE_CONFIG_H
+#ifndef GKO_CORE_METIS_TYPES_HPP_
+#define GKO_CORE_METIS_TYPES_HPP_
 
-// clang-format off
-#define GKO_VERSION_MAJOR @Ginkgo_VERSION_MAJOR@
-#define GKO_VERSION_MINOR @Ginkgo_VERSION_MINOR@
-#define GKO_VERSION_PATCH @Ginkgo_VERSION_PATCH@
-#define GKO_VERSION_TAG "@Ginkgo_VERSION_TAG@"
-#define GKO_VERSION_STR @Ginkgo_VERSION_MAJOR@, @Ginkgo_VERSION_MINOR@, @Ginkgo_VERSION_PATCH@
-// clang-format on
 
-/*
- * Controls the amount of messages output by Ginkgo.
- * 0 disables all output (except for test, benchmarks and examples).
- * 1 activates important messages.
+#include <cassert>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
+
+
+#include <complex>
+#include <type_traits>
+
+
+#include <ginkgo/config.hpp>
+#include <ginkgo/core/base/types.hpp>
+
+
+#if GKO_HAVE_METIS
+#include <metis.h>
+#define metis_indextype idx_t
+#else
+#define metis_indextype gko::int32
+#endif
+
+
+namespace gko {
+
+
+/**
+ * Instantiates a template for each index type compiled by Metis.
+ *
+ * @param _macro  A macro which expands the template instantiation
+ *                (not including the leading `template` specifier).
+ *                Should take one argument, which is replaced by the
+ *                value type.
  */
-// clang-format off
-#define GKO_VERBOSE_LEVEL @GINKGO_VERBOSE_LEVEL@
-// clang-format on
-
-// clang-format off
-#define GKO_HWLOC_XMLFILE "@HWLOC_XMLFILE@"
-// clang-format on
-
-/* Is Itanium ABI available? */
-#cmakedefine GKO_HAVE_CXXABI_H
+#define GKO_INSTANTIATE_FOR_EACH_METIS_INDEX_TYPE(_macro) \
+    template _macro(metis_indextype)
 
 
-/* Should we use all optimizations for Jacobi? */
-#cmakedefine GINKGO_JACOBI_FULL_OPTIMIZATIONS
-
-/* Is HWLOC available for obtaining the machine_info? */
-// clang-format off
-#define GKO_HAVE_HWLOC @GINKGO_HAVE_HWLOC@
-// clang-format on
-
-/* What is HIP compiled for, hcc or nvcc? */
-// clang-format off
-#define GINKGO_HIP_PLATFORM_HCC @GINKGO_HIP_PLATFORM_HCC@
-
-
-#define GINKGO_HIP_PLATFORM_NVCC @GINKGO_HIP_PLATFORM_NVCC@
-// clang-format on
+/**
+ * Instantiates a template for each index type compiled by Metis.
+ *
+ * @param _macro  A macro which expands the template instantiation
+ *                (not including the leading `template` specifier).
+ *                Should take one argument, which is replaced by the
+ *                value type.
+ */
+#define GKO_INSTANTIATE_FOR_EACH_VALUE_AND_METIS_INDEX_TYPE(_macro) \
+    template _macro(float, metis_indextype);                        \
+    template _macro(double, metis_indextype);                       \
+    template _macro(std::complex<float>, metis_indextype);          \
+    template _macro(std::complex<double>, metis_indextype)
 
 
-/* Is PAPI SDE available for Logging? */
-// clang-format off
-#define GKO_HAVE_PAPI_SDE @GINKGO_HAVE_PAPI_SDE@
-// clang-format on
+}  // namespace gko
 
 
-/* Is Metis available */
-// clang-format off
-#define GKO_HAVE_METIS @GINKGO_HAVE_METIS@
-// clang-format on
-
-
-#endif  // GKO_INCLUDE_CONFIG_H
+#endif  // GKO_CORE_METIS_TYPES_HPP_

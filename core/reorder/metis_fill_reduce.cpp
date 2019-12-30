@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2020, the Ginkgo authors
+Copyright (c) 2017-2019, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,61 +30,56 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#ifndef GKO_INCLUDE_CONFIG_H
-#define GKO_INCLUDE_CONFIG_H
-
-// clang-format off
-#define GKO_VERSION_MAJOR @Ginkgo_VERSION_MAJOR@
-#define GKO_VERSION_MINOR @Ginkgo_VERSION_MINOR@
-#define GKO_VERSION_PATCH @Ginkgo_VERSION_PATCH@
-#define GKO_VERSION_TAG "@Ginkgo_VERSION_TAG@"
-#define GKO_VERSION_STR @Ginkgo_VERSION_MAJOR@, @Ginkgo_VERSION_MINOR@, @Ginkgo_VERSION_PATCH@
-// clang-format on
-
-/*
- * Controls the amount of messages output by Ginkgo.
- * 0 disables all output (except for test, benchmarks and examples).
- * 1 activates important messages.
- */
-// clang-format off
-#define GKO_VERBOSE_LEVEL @GINKGO_VERBOSE_LEVEL@
-// clang-format on
-
-// clang-format off
-#define GKO_HWLOC_XMLFILE "@HWLOC_XMLFILE@"
-// clang-format on
-
-/* Is Itanium ABI available? */
-#cmakedefine GKO_HAVE_CXXABI_H
+#include <ginkgo/core/reorder/metis_fill_reduce.hpp>
 
 
-/* Should we use all optimizations for Jacobi? */
-#cmakedefine GINKGO_JACOBI_FULL_OPTIMIZATIONS
-
-/* Is HWLOC available for obtaining the machine_info? */
-// clang-format off
-#define GKO_HAVE_HWLOC @GINKGO_HAVE_HWLOC@
-// clang-format on
-
-/* What is HIP compiled for, hcc or nvcc? */
-// clang-format off
-#define GINKGO_HIP_PLATFORM_HCC @GINKGO_HIP_PLATFORM_HCC@
+#include <memory>
 
 
-#define GINKGO_HIP_PLATFORM_NVCC @GINKGO_HIP_PLATFORM_NVCC@
-// clang-format on
+#include <ginkgo/core/base/array.hpp>
+#include <ginkgo/core/base/exception_helpers.hpp>
+#include <ginkgo/core/base/executor.hpp>
+#include <ginkgo/core/base/metis_types.hpp>
+#include <ginkgo/core/base/polymorphic_object.hpp>
+#include <ginkgo/core/base/types.hpp>
+#include <ginkgo/core/base/utils.hpp>
+#include <ginkgo/core/matrix/csr.hpp>
+#include <ginkgo/core/matrix/permutation.hpp>
+#include <ginkgo/core/matrix/sparsity_csr.hpp>
 
 
-/* Is PAPI SDE available for Logging? */
-// clang-format off
-#define GKO_HAVE_PAPI_SDE @GINKGO_HAVE_PAPI_SDE@
-// clang-format on
+#include "core/matrix/csr_kernels.hpp"
+#include "core/reorder/metis_fill_reduce_kernels.hpp"
 
 
-/* Is Metis available */
-// clang-format off
-#define GKO_HAVE_METIS @GINKGO_HAVE_METIS@
-// clang-format on
+namespace gko {
+namespace reorder {
+namespace metis_fill_reduce {
 
 
-#endif  // GKO_INCLUDE_CONFIG_H
+GKO_REGISTER_OPERATION(get_permutation, metis_fill_reduce::get_permutation);
+
+
+}  // namespace metis_fill_reduce
+
+
+template <typename ValueType, typename IndexType>
+void MetisFillReduce<ValueType, IndexType>::generate() const
+{
+    IndexType num_rows = adjacency_matrix_->get_size()[0];
+    const auto exec = this->get_executor();
+
+    exec->run(metis_fill_reduce::make_get_permutation(
+        num_rows, adjacency_matrix_, vertex_weights_, permutation_,
+        inv_permutation_));
+}
+
+
+#define GKO_DECLARE_METIS_FILL_REDUCE(ValueType, IndexType) \
+    class MetisFillReduce<ValueType, IndexType>
+GKO_INSTANTIATE_FOR_EACH_VALUE_AND_METIS_INDEX_TYPE(
+    GKO_DECLARE_METIS_FILL_REDUCE);
+
+
+}  // namespace reorder
+}  // namespace gko

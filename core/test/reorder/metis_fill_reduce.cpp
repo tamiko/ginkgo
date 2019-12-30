@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2020, the Ginkgo authors
+Copyright (c) 2017-2019, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,61 +30,44 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#ifndef GKO_INCLUDE_CONFIG_H
-#define GKO_INCLUDE_CONFIG_H
-
-// clang-format off
-#define GKO_VERSION_MAJOR @Ginkgo_VERSION_MAJOR@
-#define GKO_VERSION_MINOR @Ginkgo_VERSION_MINOR@
-#define GKO_VERSION_PATCH @Ginkgo_VERSION_PATCH@
-#define GKO_VERSION_TAG "@Ginkgo_VERSION_TAG@"
-#define GKO_VERSION_STR @Ginkgo_VERSION_MAJOR@, @Ginkgo_VERSION_MINOR@, @Ginkgo_VERSION_PATCH@
-// clang-format on
-
-/*
- * Controls the amount of messages output by Ginkgo.
- * 0 disables all output (except for test, benchmarks and examples).
- * 1 activates important messages.
- */
-// clang-format off
-#define GKO_VERBOSE_LEVEL @GINKGO_VERBOSE_LEVEL@
-// clang-format on
-
-// clang-format off
-#define GKO_HWLOC_XMLFILE "@HWLOC_XMLFILE@"
-// clang-format on
-
-/* Is Itanium ABI available? */
-#cmakedefine GKO_HAVE_CXXABI_H
+#include <ginkgo/core/reorder/metis_fill_reduce.hpp>
 
 
-/* Should we use all optimizations for Jacobi? */
-#cmakedefine GINKGO_JACOBI_FULL_OPTIMIZATIONS
-
-/* Is HWLOC available for obtaining the machine_info? */
-// clang-format off
-#define GKO_HAVE_HWLOC @GINKGO_HAVE_HWLOC@
-// clang-format on
-
-/* What is HIP compiled for, hcc or nvcc? */
-// clang-format off
-#define GINKGO_HIP_PLATFORM_HCC @GINKGO_HIP_PLATFORM_HCC@
+#include <memory>
 
 
-#define GINKGO_HIP_PLATFORM_NVCC @GINKGO_HIP_PLATFORM_NVCC@
-// clang-format on
+#include <gtest/gtest.h>
 
 
-/* Is PAPI SDE available for Logging? */
-// clang-format off
-#define GKO_HAVE_PAPI_SDE @GINKGO_HAVE_PAPI_SDE@
-// clang-format on
+#include <ginkgo/core/base/executor.hpp>
+#include <ginkgo/core/base/metis_types.hpp>
+#include <ginkgo/core/matrix/dense.hpp>
 
 
-/* Is Metis available */
-// clang-format off
-#define GKO_HAVE_METIS @GINKGO_HAVE_METIS@
-// clang-format on
+namespace {
 
 
-#endif  // GKO_INCLUDE_CONFIG_H
+class MetisFillReduce : public ::testing::Test {
+protected:
+    using v_type = double;
+    using i_type = metis_indextype;
+    using Mtx = gko::matrix::Dense<v_type>;
+    using reorder_factory_type = gko::reorder::MetisFillReduce<v_type, i_type>;
+
+    MetisFillReduce()
+        : exec(gko::ReferenceExecutor::create()),
+          metis_fill_reduce_factory(reorder_factory_type::build().on(exec))
+    {}
+
+    std::shared_ptr<const gko::Executor> exec;
+    std::unique_ptr<reorder_factory_type::Factory> metis_fill_reduce_factory;
+};
+
+
+TEST_F(MetisFillReduce, MetisFillReduceFactoryKnowsItsExecutor)
+{
+    ASSERT_EQ(metis_fill_reduce_factory->get_executor(), exec);
+}
+
+
+}  // namespace

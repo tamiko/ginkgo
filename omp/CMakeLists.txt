@@ -15,6 +15,7 @@ target_sources(ginkgo_omp
         matrix/sellp_kernels.cpp
         matrix/sparsity_csr_kernels.cpp
         preconditioner/jacobi_kernels.cpp
+        reorder/metis_fill_reduce_kernels.cpp
         reorder/rcm_kernels.cpp
         solver/bicg_kernels.cpp
         solver/bicgstab_kernels.cpp
@@ -43,6 +44,9 @@ target_link_libraries(ginkgo_omp PUBLIC ginkgo_cuda)
 # Need to link against ginkgo_hip for the `raw_copy_to(HipExecutor ...)` method
 target_link_libraries(ginkgo_omp PUBLIC ginkgo_hip)
 
+if (GINKGO_HAVE_METIS)
+  target_link_libraries(ginkgo_omp PRIVATE METIS::METIS)
+endif()
 
 ginkgo_default_includes(ginkgo_omp)
 ginkgo_install_library(ginkgo_omp omp)

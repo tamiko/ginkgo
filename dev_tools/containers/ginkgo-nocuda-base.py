@@ -33,6 +33,8 @@ Stage0 += python()
 Stage0 += cmake(eula=True)
 Stage0 += apt_get(ospackages=['build-essential', 'git', 'openssh-client', 'curl', 'valgrind'])
 Stage0 += apt_get(ospackages=['jq', 'graphviz', 'ghostscript'])
+if os.path.isdir('metis/') and add_metis == 'True':
+    Stage0 += apt_get(ospackages=['libmetis-dev'])
 Stage0 += apt_get(ospackages=['clang-tidy', 'iwyu'])
 Stage0 += apt_get(ospackages=['hwloc', 'libhwloc-dev', 'pkg-config'])
 Stage0 += apt_get(ospackages=['gpg-agent'])
