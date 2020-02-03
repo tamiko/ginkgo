@@ -557,7 +557,8 @@ void spgeam(syn::value_list<int, subwarp_size>,
     // accumulate non-zeros for alpha * A + beta * B
     matrix::CsrBuilder<ValueType, IndexType> c_builder{c};
     IndexType c_nnz{};
-    exec->get_master()->copy_from(exec.get(), 1, c_row_ptrs + m, &c_nnz);
+    exec->get_master()->get_mem_space()->copy_from(exec->get_mem_space().get(),
+                                                   1, c_row_ptrs + m, &c_nnz);
     c_builder.get_col_idx_array().resize_and_reset(c_nnz);
     c_builder.get_value_array().resize_and_reset(c_nnz);
     auto c_col_idxs = c->get_col_idxs();
