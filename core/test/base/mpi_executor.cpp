@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2019, the Ginkgo authors
+Copyright (c) 2017-2020, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -84,80 +84,35 @@ protected:
     // std::shared_ptr<gko::MpiExecutor> mpi;
 };
 
-// TEST(MpiExecutor, IsItsOwnMaster)
-// {
-//     exec_ptr mpi = gko::MpiExecutor::create();
-
-//     ASSERT_EQ(mpi, mpi->get_master());
-// }
-
-
-// TEST_F(MPITest, RunsCorrectOperation)
-// {
-//     int value = 0;
-//     // exec_ptr mpi = gko::MpiExecutor::create();
-
-//     mpi->run(ExampleOperation(value));
-//     ASSERT_EQ(2, value);
-// }
-
-
-// TEST_F(MPITest, RunsCorrectLambdaOperation)
-// {
-//     int value = 0;
-//     auto omp_lambda = [&value]() { value = 1; };
-//     auto mpi_lambda = [&value]() { value = 2; };
-//     auto cuda_lambda = [&value]() { value = 4; };
-//     // exec_ptr mpi = gko::MpiExecutor::create();
-
-//     mpi->run(omp_lambda, mpi_lambda, cuda_lambda);
-//     ASSERT_EQ(2, value);
-// }
-
-
-TEST_F(MPITest, AllocatesAndFreesMemory)
+TEST(MpiExecutor, IsItsOwnMaster)
 {
-    const int num_elems = 10;
-    // exec_ptr mpi = gko::MpiExecutor::create();
-    int *ptr = nullptr;
+    auto mpi = gko::MpiExecutor::create();
 
-    ASSERT_NO_THROW(ptr = mpi->alloc<int>(num_elems));
-    ASSERT_NO_THROW(mpi->free(ptr));
+    ASSERT_EQ(mpi, mpi->get_master());
 }
 
 
-TEST_F(MPITest, FreeAcceptsNullptr)
+TEST_F(MPITest, RunsCorrectOperation)
 {
-    // exec_ptr mpi = gko::MpiExecutor::create();
-    ASSERT_NO_THROW(mpi->free(nullptr));
+    int value = 0;
+    auto mpi = gko::MpiExecutor::create();
+
+    mpi->run(ExampleOperation(value));
+    ASSERT_EQ(2, value);
 }
 
 
-TEST_F(MPITest, FailsWhenOverallocating)
+TEST_F(MPITest, RunsCorrectLambdaOperation)
 {
-    const gko::size_type num_elems = 1ll << 50;  // 4PB of integers
-    // exec_ptr mpi = gko::MpiExecutor::create();
-    int *ptr = nullptr;
+    int value = 0;
+    auto omp_lambda = [&value]() { value = 1; };
+    auto mpi_lambda = [&value]() { value = 2; };
+    auto cuda_lambda = [&value]() { value = 4; };
+    auto hip_lambda = [&value]() { value = 4; };
+    auto mpi = gko::MpiExecutor::create();
 
-    ASSERT_THROW(ptr = mpi->alloc<int>(num_elems), gko::AllocationError);
-
-    mpi->free(ptr);
-}
-
-
-TEST_F(MPITest, CopiesData)
-{
-    int orig[] = {3, 8};
-    const int num_elems = std::extent<decltype(orig)>::value;
-    // exec_ptr mpi = gko::MpiExecutor::create();
-    int *copy = mpi->alloc<int>(num_elems);
-
-    // user code is run on the MPI, so local variables are in MPI memory
-    mpi->copy_from(mpi.get(), num_elems, orig, copy);
-    EXPECT_EQ(3, copy[0]);
-    EXPECT_EQ(8, copy[1]);
-
-    mpi->free(copy);
+    mpi->run(omp_lambda, mpi_lambda, cuda_lambda, hip_lambda);
+    ASSERT_EQ(2, value);
 }
 
 

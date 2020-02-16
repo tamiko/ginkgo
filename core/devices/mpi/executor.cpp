@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2019, the Ginkgo authors
+Copyright (c) 2017-2020, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -44,9 +44,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace gko {
 
 
-void MpiExecutor::raw_free(void *ptr) const noexcept { std::free(ptr); }
-
-
 std::shared_ptr<Executor> MpiExecutor::get_master() noexcept
 {
     return this->shared_from_this();
@@ -59,35 +56,16 @@ std::shared_ptr<const Executor> MpiExecutor::get_master() const noexcept
 }
 
 
-void *MpiExecutor::raw_alloc(size_type num_bytes) const
+std::shared_ptr<MemorySpace> MpiExecutor::get_mem_space() noexcept
 {
-    return GKO_ENSURE_ALLOCATED(std::malloc(num_bytes), "MPI", num_bytes);
+    return this->mem_space_instance_;
 }
 
 
-void MpiExecutor::raw_copy_to(const MpiExecutor *, size_type num_bytes,
-                              const void *src_ptr, void *dest_ptr) const
+std::shared_ptr<const MemorySpace> MpiExecutor::get_mem_space() const noexcept
 {
-    std::memcpy(dest_ptr, src_ptr, num_bytes);
+    return this->mem_space_instance_;
 }
-
-
-void MpiExecutor::raw_copy_to(const OmpExecutor *, size_type num_bytes,
-                              const void *src_ptr, void *dest_ptr) const
-{
-    std::memcpy(dest_ptr, src_ptr, num_bytes);
-}
-
-
-void OmpExecutor::raw_copy_to(const MpiExecutor *, size_type num_bytes,
-                              const void *src_ptr, void *dest_ptr) const
-{
-    std::memcpy(dest_ptr, src_ptr, num_bytes);
-}
-
-void MpiExecutor::raw_copy_to(const CudaExecutor *, size_type num_bytes,
-                              const void *src_ptr, void *dest_ptr) const
-    GKO_NOT_COMPILED(cuda);
 
 
 void MpiExecutor::synchronize() const

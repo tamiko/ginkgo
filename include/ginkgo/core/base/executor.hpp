@@ -637,6 +637,8 @@ class OmpExecutor : public detail::ExecutorBase<OmpExecutor>,
 public:
     using omp_exec_info = machine_config::topology<OmpExecutor>;
 
+    using DefaultMemorySpace = HostMemorySpace;
+
     /**
      * Creates a new OmpExecutor.
      */
@@ -689,9 +691,9 @@ protected:
 
     bool check_mem_space_validity(std::shared_ptr<MemorySpace> mem_space)
     {
-        auto check_host_mem_space =
-            dynamic_cast<HostMemorySpace *>(mem_space.get());
-        if (check_host_mem_space == nullptr) {
+        auto check_default_mem_space =
+            dynamic_cast<DefaultMemorySpace *>(mem_space.get());
+        if (check_default_mem_space == nullptr) {
             return false;
         } else {
             return true;
@@ -719,14 +721,18 @@ using DefaultExecutor = OmpExecutor;
  * @ingroup Executor
  */
 class MpiExecutor : public detail::ExecutorBase<MpiExecutor>,
-                    public std::enable_shared_from_this<MpiExecutor> {
+                    public std::enable_shared_from_this<MpiExecutor>,
+                    public machine_config::topology<MpiExecutor> {
     friend class detail::ExecutorBase<MpiExecutor>;
 
 public:
+    using mpi_exec_info = machine_config::topology<MpiExecutor>;
+
+    using DefaultMemorySpace = HostMemorySpace;
+
     /**
      * Creates a new MpiExecutor.
      */
-
     static std::shared_ptr<MpiExecutor> create(int &num_args, char **&args,
                                                int required_thread_support);
 
@@ -744,7 +750,18 @@ public:
 
     int get_my_rank();
 
+    std::shared_ptr<MemorySpace> get_mem_space() noexcept override;
+
+    std::shared_ptr<const MemorySpace> get_mem_space() const noexcept override;
+
     void synchronize() const override;
+
+    /**
+     * Get the Executor information for this executor
+     *
+     * @return the executor info (mpi_exec_info*) for this executor
+     */
+    mpi_exec_info *get_exec_info() const { return exec_info_.get(); }
 
 protected:
     MpiExecutor() = delete;
@@ -764,11 +781,17 @@ protected:
         num_ranks_ = this->get_num_ranks();
     }
 
-    void *raw_alloc(size_type size) const override;
+    bool check_mem_space_validity(std::shared_ptr<MemorySpace> mem_space)
+    {
+        auto check_default_mem_space =
+            dynamic_cast<DefaultMemorySpace *>(mem_space.get());
+        if (check_default_mem_space == nullptr) {
+            return false;
+        } else {
+            return true;
+        }
+    }
 
-    void raw_free(void *ptr) const noexcept override;
-
-    GKO_ENABLE_FOR_ALL_EXECUTORS(GKO_OVERRIDE_RAW_COPY_TO);
 
 private:
     int num_ranks_;
@@ -780,6 +803,9 @@ private:
     template <typename T>
     using handle_manager = std::unique_ptr<T, std::function<void(T *)>>;
     handle_manager<MpiContext> mpi_comm_;
+
+    std::unique_ptr<mpi_exec_info> exec_info_;
+    std::shared_ptr<MemorySpace> mem_space_instance_;
 };
 
 
@@ -863,13 +889,15 @@ protected:
 
     bool check_mem_space_validity(std::shared_ptr<MemorySpace> mem_space)
     {
-        auto check_host_mem_space =
-            dynamic_cast<HostMemorySpace *>(mem_space.get());
-        if (check_host_mem_space == nullptr) {
+        auto check_default_mem_space =
+            dynamic_cast<DefaultMemorySpace *>(mem_space.get());
+        if (check_default_mem_space == nullptr) {
             return false;
+        } else {
+            return true;
         }
-        return true;
     }
+
 
 private:
     std::unique_ptr<ref_exec_info> exec_info_;

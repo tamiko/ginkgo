@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2019, the Ginkgo authors
+Copyright (c) 2017-2020, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -102,6 +102,15 @@ GKO_DECLARE_ALL_AS_TEMPLATES;
 
 }  // namespace metis_fill_reduce
 }  // namespace hip
+
+
+namespace mpi {
+namespace metis_fill_reduce {
+
+GKO_DECLARE_ALL_AS_TEMPLATES;
+
+}  // namespace metis_fill_reduce
+}  // namespace mpi
 
 
 #undef GKO_DECLARE_ALL_AS_TEMPLATES

@@ -1,5 +1,5 @@
 /*******************************<GINKGO LICENSE>******************************
-Copyright (c) 2017-2019, the Ginkgo authors
+Copyright (c) 2017-2020, the Ginkgo authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -295,6 +295,22 @@ private:
     void raw_copy_to(const _memory_space_type *dest_mem_space,               \
                      size_type n_bytes, const void *src_ptr, void *dest_ptr) \
         const override
+
+
+class DistributedMemorySpace {
+public:
+    /**
+     * Creates a new DistributedMemorySpace.
+     */
+    static std::shared_ptr<DistributedMemorySpace> create()
+    {
+        return std::shared_ptr<DistributedMemorySpace>(
+            new DistributedMemorySpace());
+    }
+
+protected:
+    DistributedMemorySpace() = default;
+};
 
 
 class HostMemorySpace : public detail::MemorySpaceBase<HostMemorySpace> {
