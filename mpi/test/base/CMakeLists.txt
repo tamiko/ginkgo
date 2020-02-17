@@ -1,0 +1,2 @@
+ginkgo_create_mpi_test(mpi_executor)
+ginkgo_create_mpi_test(exception_helpers)

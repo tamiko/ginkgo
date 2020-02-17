@@ -30,74 +30,34 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#include <ginkgo/core/base/exception_helpers.hpp>
-#include <ginkgo/core/base/executor.hpp>
-#include <ginkgo/core/base/version.hpp>
+#include "core/components/prefix_sum.hpp"
 
 
 namespace gko {
+namespace kernels {
+namespace mpi {
 
 
-version version_info::get_mpi_version() noexcept
+template <typename IndexType>
+void prefix_sum(std::shared_ptr<const MpiExecutor> exec, IndexType *counts,
+                size_type num_entries)
 {
-    // We just return 1.0.0 with a special "not compiled" tag in placeholder
-    // modules.
-    return {1, 0, 0, "not compiled"};
+    IndexType partial_sum{};
+    for (IndexType i = 0; i < num_entries; ++i) {
+        auto nnz = counts[i];
+        counts[i] = partial_sum;
+        partial_sum += nnz;
+    }
 }
 
-void MpiExecutor::synchronize() const {}
+GKO_INSTANTIATE_FOR_EACH_INDEX_TYPE(GKO_DECLARE_PREFIX_SUM_KERNEL);
 
-void MpiExecutor::mpi_init() {}
-
-int MpiExecutor::get_num_ranks() { return 0; }
-
-std::shared_ptr<MpiExecutor> MpiExecutor::create(int &num_args, char **&args,
-                                                 int required_thread_support,
-                                                 bool enable_gpu)
-{
-    return std::shared_ptr<MpiExecutor>(
-        new MpiExecutor(num_args, args, required_thread_support, enable_gpu));
-}
-
-// void MpiExecutor::run(const Operation &op) const
-// {
-//     op.run(
-//         std::static_pointer_cast<const
-//         MpiExecutor>(this->shared_from_this()));
-// }
-
-std::shared_ptr<MpiExecutor> MpiExecutor::create()
-{
-    int num_args = 0;
-    char **args;
-    return MpiExecutor::create(num_args, args, 0, false);
-}
+// explicitly instantiate for size_type as well, as this is used in the SellP
+// format
+template void prefix_sum<size_type>(std::shared_ptr<const MpiExecutor> exec,
+                                    size_type *counts, size_type num_entries);
 
 
-std::string MpiError::get_error(int64)
-{
-    return "ginkgo MPI module is not compiled";
-}
-
-
-bool MpiExecutor::is_finalized() GKO_NOT_COMPILED(mpi);
-
-
-bool MpiExecutor::is_initialized() GKO_NOT_COMPILED(mpi);
-
-
-void MpiExecutor::destroy() GKO_NOT_COMPILED(mpi);
-
-
-// void MpiExecutor::synchronize_communicator(
-//     gko::MpiExecutor::handle_manager<MpiContext> comm) const
-//     GKO_NOT_COMPILED(mpi);
-
-void MpiExecutor::synchronize() const GKO_NOT_COMPILED(mpi);
-
+}  // namespace mpi
+}  // namespace kernels
 }  // namespace gko
-
-
-#define GKO_HOOK_MODULE mpi
-#include "core/device_hooks/common_kernels.inc.cpp"
-#undef GKO_HOOK_MODULE

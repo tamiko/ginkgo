@@ -48,10 +48,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace gko {
 
+
 void MpiExecutor::mpi_init()
 {
-    int flag = 0;
-    GKO_ASSERT_NO_MPI_ERRORS(MPI_Initialized(&flag));
+    auto flag = MpiExecutor::is_initialized();
     if (!flag) {
         GKO_ASSERT_NO_MPI_ERRORS(MPI_Init_thread(
             &(this->num_args_), &(this->args_), this->required_thread_support_,
@@ -60,6 +60,18 @@ void MpiExecutor::mpi_init()
         GKO_MPI_INITIALIZED;
     }
 }
+
+
+// void MpiExecutor::synchronize_communicator(
+//     gko::MpiExecutor::handle_manager<MpiContext> comm) const
+// {
+//     kernels::mpi::synchronize(comm);
+//     // GKO_ASSERT_NO_MPI_ERRORS(MPI_Barrier(comm));
+// }
+
+
+void MpiExecutor::synchronize() const { MPI_Barrier(MPI_COMM_WORLD); }
+
 
 int MpiExecutor::get_my_rank()
 {
@@ -78,33 +90,47 @@ int MpiExecutor::get_num_ranks()
 
 
 std::shared_ptr<MpiExecutor> MpiExecutor::create(int &num_args, char **&args,
-                                                 int required_thread_support)
+                                                 int required_thread_support,
+                                                 bool enable_gpu)
 {
     return std::shared_ptr<MpiExecutor>(
-        new MpiExecutor(num_args, args, required_thread_support),
+        new MpiExecutor(num_args, args, required_thread_support, enable_gpu),
         [](MpiExecutor *exec) { delete exec; });
 }
+
 
 std::shared_ptr<MpiExecutor> MpiExecutor::create()
 {
     int num_args = 0;
     char **args;
-    return MpiExecutor::create(num_args, args, MPI_THREAD_SINGLE);
+    return MpiExecutor::create(num_args, args, MPI_THREAD_SINGLE, false);
 }
+
+
+bool MpiExecutor::is_initialized()
+{
+    int flag = 0;
+    GKO_ASSERT_NO_MPI_ERRORS(MPI_Initialized(&flag));
+    return flag;
+}
+
 
 bool MpiExecutor::is_finalized()
 {
     int flag = 0;
-    MPI_Finalized(&flag);
+    GKO_ASSERT_NO_MPI_ERRORS(MPI_Finalized(&flag));
     return flag;
 }
 
+
 void MpiExecutor::destroy()
 {
-    if (!MpiExecutor::is_finalized()) {
-        MPI_Finalize();
+    auto flag = MpiExecutor::is_finalized();
+    if (!flag) {
+        GKO_ASSERT_NO_MPI_ERRORS(MPI_Finalize());
     }
 }
+
 
 // MpiContext MpiExecutor::create_comms()
 // {

@@ -53,6 +53,11 @@ namespace kernels {
  */
 namespace mpi {
 
+// inline void synchronize(MPI_Comm comm)
+// {
+//     GKO_ASSERT_NO_MPI_ERRORS(MPI_Barrier(comm));
+// }
+
 // inline MPI_Comm create_comms(MPI_Comm comm_in, int color, int key)
 // {
 //     MPI_Comm comm;

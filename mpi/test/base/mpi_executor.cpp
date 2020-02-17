@@ -30,74 +30,63 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#include <ginkgo/core/base/exception_helpers.hpp>
 #include <ginkgo/core/base/executor.hpp>
-#include <ginkgo/core/base/version.hpp>
 
 
-namespace gko {
+#include <memory>
+#include <type_traits>
 
 
-version version_info::get_mpi_version() noexcept
+#include <gtest/gtest.h>
+
+
+#include <ginkgo/core/base/exception.hpp>
+#include <ginkgo/core/base/exception_helpers.hpp>
+
+
+#include <mpi.h>
+
+
+namespace {
+
+
+class MpiExecutor : public ::testing::Test {
+protected:
+    MpiExecutor() : mpi(nullptr), mpi2(nullptr) {}
+
+    void SetUp()
+    {
+        char **argv;
+        int argc = 0;
+        // mpi = gko::MpiExecutor::create();
+        mpi2 = gko::MpiExecutor::create(argc, argv, 1, true);
+    }
+
+    void TearDown()
+    {
+        if (mpi != nullptr) {
+            // ensure that previous calls finished and didn't throw an error
+            ASSERT_NO_THROW(mpi->synchronize());
+        }
+    }
+
+    std::shared_ptr<gko::MpiExecutor> mpi;
+    std::shared_ptr<gko::MpiExecutor> mpi2;
+};
+
+
+TEST_F(MpiExecutor, MpiNonZeroRanks)
 {
-    // We just return 1.0.0 with a special "not compiled" tag in placeholder
-    // modules.
-    return {1, 0, 0, "not compiled"};
+    ASSERT_GE(mpi2->get_num_ranks(), 1);
+    int rank = -1;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    ASSERT_EQ(mpi2->get_my_rank(), 1);
 }
 
-void MpiExecutor::synchronize() const {}
 
-void MpiExecutor::mpi_init() {}
-
-int MpiExecutor::get_num_ranks() { return 0; }
-
-std::shared_ptr<MpiExecutor> MpiExecutor::create(int &num_args, char **&args,
-                                                 int required_thread_support,
-                                                 bool enable_gpu)
-{
-    return std::shared_ptr<MpiExecutor>(
-        new MpiExecutor(num_args, args, required_thread_support, enable_gpu));
-}
-
-// void MpiExecutor::run(const Operation &op) const
+// TEST_F(MpiExecutor, KnowsCorrectRank)
 // {
-//     op.run(
-//         std::static_pointer_cast<const
-//         MpiExecutor>(this->shared_from_this()));
 // }
 
-std::shared_ptr<MpiExecutor> MpiExecutor::create()
-{
-    int num_args = 0;
-    char **args;
-    return MpiExecutor::create(num_args, args, 0, false);
-}
 
-
-std::string MpiError::get_error(int64)
-{
-    return "ginkgo MPI module is not compiled";
-}
-
-
-bool MpiExecutor::is_finalized() GKO_NOT_COMPILED(mpi);
-
-
-bool MpiExecutor::is_initialized() GKO_NOT_COMPILED(mpi);
-
-
-void MpiExecutor::destroy() GKO_NOT_COMPILED(mpi);
-
-
-// void MpiExecutor::synchronize_communicator(
-//     gko::MpiExecutor::handle_manager<MpiContext> comm) const
-//     GKO_NOT_COMPILED(mpi);
-
-void MpiExecutor::synchronize() const GKO_NOT_COMPILED(mpi);
-
-}  // namespace gko
-
-
-#define GKO_HOOK_MODULE mpi
-#include "core/device_hooks/common_kernels.inc.cpp"
-#undef GKO_HOOK_MODULE
+}  // namespace

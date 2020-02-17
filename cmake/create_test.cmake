@@ -102,10 +102,12 @@ function(ginkgo_create_mpi_test test_name)
     ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR})
   string(REPLACE "/" "_" TEST_TARGET_NAME "${REL_BINARY_DIR}/${test_name}")
   add_executable(${TEST_TARGET_NAME} ${test_name}.cpp)
+  target_include_directories(${TEST_TARGET_NAME}
+    SYSTEM PRIVATE ${MPI_INCLUDE_PATH})
   set_target_properties(${TEST_TARGET_NAME} PROPERTIES
     OUTPUT_NAME ${test_name})
-  target_link_libraries(${TEST_TARGET_NAME} PRIVATE ginkgo GTest::GTest GTest::Main ${ARGN})
-  set(MPI_COMMAND "${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS} ${TEST_TARGET_NAME} ${MPIEXEC_POSTFLAGS} -np 1")
+  target_link_libraries(${TEST_TARGET_NAME} PRIVATE ginkgo GTest::GTest GTest::Main ${ARGN} ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
+  set(MPI_COMMAND "${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS} ${TEST_TARGET_NAME} ${MPIEXEC_POSTFLAGS} -np 2")
   add_test(NAME ${REL_BINARY_DIR}/${test_name} COMMAND ${MPI_COMMAND} )
 endfunction(ginkgo_create_mpi_test)
 

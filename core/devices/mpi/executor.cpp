@@ -68,11 +68,4 @@ std::shared_ptr<const MemorySpace> MpiExecutor::get_mem_space() const noexcept
 }
 
 
-void MpiExecutor::synchronize() const
-{
-    // This is a no-op for single-threaded MPI
-    // TODO: change when adding support for multi-threaded MPI execution
-}
-
-
 }  // namespace gko

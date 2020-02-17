@@ -33,16 +33,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "core/matrix/ell_kernels.hpp"
 
 
-#include <mpi.h>
-
-
 #include <ginkgo/core/base/exception_helpers.hpp>
 #include <ginkgo/core/base/math.hpp>
 #include <ginkgo/core/matrix/csr.hpp>
 #include <ginkgo/core/matrix/dense.hpp>
-
-
-#include "mpi/components/format_conversion.hpp"
 
 
 namespace gko {
@@ -50,7 +44,7 @@ namespace kernels {
 namespace mpi {
 /**
  * @brief The ELL matrix format namespace.
- *
+ * @ref Ell
  * @ingroup ell
  */
 namespace ell {
@@ -63,7 +57,6 @@ void spmv(std::shared_ptr<const MpiExecutor> exec,
 {
     auto num_stored_elements_per_row = a->get_num_stored_elements_per_row();
 
-#pragma omp parallel for
     for (size_type row = 0; row < a->get_size()[0]; row++) {
         for (size_type j = 0; j < c->get_size()[1]; j++) {
             c->at(row, j) = zero<ValueType>();
@@ -93,7 +86,6 @@ void advanced_spmv(std::shared_ptr<const MpiExecutor> exec,
     auto alpha_val = alpha->at(0, 0);
     auto beta_val = beta->at(0, 0);
 
-#pragma omp parallel for
     for (size_type row = 0; row < a->get_size()[0]; row++) {
         for (size_type j = 0; j < c->get_size()[1]; j++) {
             c->at(row, j) *= beta_val;
@@ -122,7 +114,6 @@ void convert_to_dense(std::shared_ptr<const MpiExecutor> exec,
     auto num_stored_elements_per_row =
         source->get_num_stored_elements_per_row();
 
-#pragma omp parallel for
     for (size_type row = 0; row < num_rows; row++) {
         for (size_type col = 0; col < num_cols; col++) {
             result->at(row, col) = zero<ValueType>();
@@ -141,15 +132,52 @@ template <typename ValueType, typename IndexType>
 void convert_to_csr(std::shared_ptr<const MpiExecutor> exec,
                     matrix::Csr<ValueType, IndexType> *result,
                     const matrix::Ell<ValueType, IndexType> *source)
-    GKO_NOT_IMPLEMENTED;
+{
+    const auto num_rows = source->get_size()[0];
+    const auto max_nnz_per_row = source->get_num_stored_elements_per_row();
+
+    auto row_ptrs = result->get_row_ptrs();
+    auto col_idxs = result->get_col_idxs();
+    auto values = result->get_values();
+
+    size_type cur_ptr = 0;
+    row_ptrs[0] = 0;
+    for (size_type row = 0; row < num_rows; row++) {
+        for (size_type i = 0; i < max_nnz_per_row; i++) {
+            const auto val = source->val_at(row, i);
+            const auto col = source->col_at(row, i);
+            if (val != zero<ValueType>()) {
+                values[cur_ptr] = val;
+                col_idxs[cur_ptr] = col;
+                cur_ptr++;
+            }
+        }
+        row_ptrs[row + 1] = cur_ptr;
+    }
+}
 
 GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
     GKO_DECLARE_ELL_CONVERT_TO_CSR_KERNEL);
 
+
 template <typename ValueType, typename IndexType>
 void count_nonzeros(std::shared_ptr<const MpiExecutor> exec,
                     const matrix::Ell<ValueType, IndexType> *source,
-                    size_type *result) GKO_NOT_IMPLEMENTED;
+                    size_type *result)
+{
+    size_type nonzeros = 0;
+    const auto num_rows = source->get_size()[0];
+    const auto max_nnz_per_row = source->get_num_stored_elements_per_row();
+    const auto stride = source->get_stride();
+
+    for (size_type row = 0; row < num_rows; row++) {
+        for (size_type i = 0; i < max_nnz_per_row; i++) {
+            nonzeros += (source->val_at(row, i) != zero<ValueType>());
+        }
+    }
+
+    *result = nonzeros;
+}
 
 GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
     GKO_DECLARE_ELL_COUNT_NONZEROS_KERNEL);
@@ -158,7 +186,23 @@ GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
 template <typename ValueType, typename IndexType>
 void calculate_nonzeros_per_row(std::shared_ptr<const MpiExecutor> exec,
                                 const matrix::Ell<ValueType, IndexType> *source,
-                                Array<size_type> *result) GKO_NOT_IMPLEMENTED;
+                                Array<size_type> *result)
+{
+    const auto num_rows = source->get_size()[0];
+    const auto max_nnz_per_row = source->get_num_stored_elements_per_row();
+    const auto stride = source->get_stride();
+
+    auto row_nnz_val = result->get_data();
+
+    for (size_type row = 0; row < num_rows; row++) {
+        size_type nonzeros_in_this_row = 0;
+        for (size_type i = 0; i < max_nnz_per_row; i++) {
+            nonzeros_in_this_row +=
+                (source->val_at(row, i) != zero<ValueType>());
+        }
+        row_nnz_val[row] = nonzeros_in_this_row;
+    }
+}
 
 GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
     GKO_DECLARE_ELL_CALCULATE_NONZEROS_PER_ROW_KERNEL);

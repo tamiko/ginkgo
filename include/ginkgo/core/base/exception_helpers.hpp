@@ -286,21 +286,18 @@ inline dim<2> get_size(const dim<2> &size) { return size; }
     ::gko::MetisError(__FILE__, __LINE__, __func__, _errcode)
 
 
+// if (!(::gko::MpiExecutor::is_finalized())) {
 /**
  * Asserts that a MPI library call completed without errors.
  *
  * @param _mpi_call  a library call expression
  */
-#define GKO_ASSERT_NO_MPI_ERRORS(_mpi_call)          \
-    do {                                             \
-        if (!(::gko::MpiExecutor::is_finalized())) { \
-            auto _errcode = _mpi_call;               \
-            if (_errcode != MPI_SUCCESS) {           \
-                throw GKO_MPI_ERROR(_errcode);       \
-            }                                        \
-        } else {                                     \
-            GKO_MPI_FINALIZED;                       \
-        }                                            \
+#define GKO_ASSERT_NO_MPI_ERRORS(_mpi_call) \
+    do {                                    \
+        auto _errcode = _mpi_call;          \
+        if (_errcode != MPI_SUCCESS) {      \
+            throw GKO_MPI_ERROR(_errcode);  \
+        }                                   \
     } while (false)
 
 /**

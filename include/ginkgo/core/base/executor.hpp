@@ -726,6 +726,9 @@ class MpiExecutor : public detail::ExecutorBase<MpiExecutor>,
     friend class detail::ExecutorBase<MpiExecutor>;
 
 public:
+    template <typename T>
+    using handle_manager = std::unique_ptr<T, std::function<void(T *)>>;
+
     using mpi_exec_info = machine_config::topology<MpiExecutor>;
 
     using DefaultMemorySpace = HostMemorySpace;
@@ -734,11 +737,10 @@ public:
      * Creates a new MpiExecutor.
      */
     static std::shared_ptr<MpiExecutor> create(int &num_args, char **&args,
-                                               int required_thread_support);
+                                               int required_thread_support,
+                                               bool enable_gpu);
 
     static std::shared_ptr<MpiExecutor> create();
-
-    static void destroy();
 
     std::shared_ptr<Executor> get_master() noexcept override;
 
@@ -748,13 +750,15 @@ public:
 
     static int get_num_ranks();
 
-    int get_my_rank();
+    static int get_my_rank();
 
     std::shared_ptr<MemorySpace> get_mem_space() noexcept override;
 
     std::shared_ptr<const MemorySpace> get_mem_space() const noexcept override;
 
     void synchronize() const override;
+
+    // void synchronize_communicator(handle_manager<MpiContext> comm) const;
 
     /**
      * Get the Executor information for this executor
@@ -768,12 +772,18 @@ protected:
 
     void mpi_init();
 
-    static bool is_finalized();
+    bool is_finalized();
 
-    MpiExecutor(int &num_args, char **&args, int required_thread_support)
+    bool is_initialized();
+
+    void destroy();
+
+    MpiExecutor(int &num_args, char **&args, int required_thread_support,
+                bool enable_gpu)
         : num_ranks_(1),
           num_args_(num_args),
           args_(args),
+          enable_gpu_(enable_gpu),
           required_thread_support_(required_thread_support),
           provided_thread_support_(0)
     {
@@ -796,12 +806,11 @@ protected:
 private:
     int num_ranks_;
     int num_args_;
+    bool enable_gpu_;
     char **args_;
     int required_thread_support_;
     int provided_thread_support_;
 
-    template <typename T>
-    using handle_manager = std::unique_ptr<T, std::function<void(T *)>>;
     handle_manager<MpiContext> mpi_comm_;
 
     std::unique_ptr<mpi_exec_info> exec_info_;

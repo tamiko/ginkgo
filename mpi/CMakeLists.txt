@@ -6,19 +6,27 @@ target_sources(ginkgo_mpi
         base/exception.cpp
         base/executor.cpp
         base/version.cpp
+        components/prefix_sum.cpp
+        factorization/par_ilu_kernels.cpp
         matrix/coo_kernels.cpp
         matrix/csr_kernels.cpp
         matrix/dense_kernels.cpp
         matrix/ell_kernels.cpp
         matrix/hybrid_kernels.cpp
         matrix/sellp_kernels.cpp
+        matrix/sparsity_csr_kernels.cpp
         preconditioner/jacobi_kernels.cpp
+        reorder/metis_fill_reduce_kernels.cpp
+        reorder/rcm_kernels.cpp
+        solver/bicg_kernels.cpp
         solver/bicgstab_kernels.cpp
         solver/cg_kernels.cpp
         solver/cgs_kernels.cpp
         solver/fcg_kernels.cpp
         solver/gmres_kernels.cpp
         solver/ir_kernels.cpp
+        solver/lower_trs_kernels.cpp
+        solver/upper_trs_kernels.cpp
         stop/criterion_kernels.cpp
         stop/residual_norm_reduction_kernels.cpp)
 

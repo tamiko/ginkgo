@@ -30,74 +30,32 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#include <ginkgo/core/base/exception_helpers.hpp>
-#include <ginkgo/core/base/executor.hpp>
-#include <ginkgo/core/base/version.hpp>
+#include <algorithm>
+#include <numeric>
 
 
 namespace gko {
+namespace kernels {
+namespace mpi {
+namespace csr {
 
 
-version version_info::get_mpi_version() noexcept
+template <typename IndexType>
+inline void convert_ptrs_to_idxs(const IndexType *ptrs, size_type num_rows,
+                                 IndexType *idxs)
 {
-    // We just return 1.0.0 with a special "not compiled" tag in placeholder
-    // modules.
-    return {1, 0, 0, "not compiled"};
-}
+    size_type ind = 0;
 
-void MpiExecutor::synchronize() const {}
-
-void MpiExecutor::mpi_init() {}
-
-int MpiExecutor::get_num_ranks() { return 0; }
-
-std::shared_ptr<MpiExecutor> MpiExecutor::create(int &num_args, char **&args,
-                                                 int required_thread_support,
-                                                 bool enable_gpu)
-{
-    return std::shared_ptr<MpiExecutor>(
-        new MpiExecutor(num_args, args, required_thread_support, enable_gpu));
-}
-
-// void MpiExecutor::run(const Operation &op) const
-// {
-//     op.run(
-//         std::static_pointer_cast<const
-//         MpiExecutor>(this->shared_from_this()));
-// }
-
-std::shared_ptr<MpiExecutor> MpiExecutor::create()
-{
-    int num_args = 0;
-    char **args;
-    return MpiExecutor::create(num_args, args, 0, false);
+    for (size_type row = 0; row < num_rows; ++row) {
+        for (size_type i = ptrs[row]; i < static_cast<size_type>(ptrs[row + 1]);
+             ++i) {
+            idxs[ind++] = row;
+        }
+    }
 }
 
 
-std::string MpiError::get_error(int64)
-{
-    return "ginkgo MPI module is not compiled";
-}
-
-
-bool MpiExecutor::is_finalized() GKO_NOT_COMPILED(mpi);
-
-
-bool MpiExecutor::is_initialized() GKO_NOT_COMPILED(mpi);
-
-
-void MpiExecutor::destroy() GKO_NOT_COMPILED(mpi);
-
-
-// void MpiExecutor::synchronize_communicator(
-//     gko::MpiExecutor::handle_manager<MpiContext> comm) const
-//     GKO_NOT_COMPILED(mpi);
-
-void MpiExecutor::synchronize() const GKO_NOT_COMPILED(mpi);
-
+}  // namespace csr
+}  // namespace mpi
+}  // namespace kernels
 }  // namespace gko
-
-
-#define GKO_HOOK_MODULE mpi
-#include "core/device_hooks/common_kernels.inc.cpp"
-#undef GKO_HOOK_MODULE
