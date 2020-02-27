@@ -327,14 +327,13 @@ public:
             this->resize_and_reset(0);
             return *this;
         }
-        if (exec_ == other.get_executor() &&
-            data_.get_deleter().target_type() != typeid(view_deleter)) {
-            // same device and not a view, only move the pointer
+        if (exec_ == other.get_executor()) {
+            // same device, only move the pointer
             using std::swap;
             swap(data_, other.data_);
             swap(num_elems_, other.num_elems_);
         } else {
-            // different device or a view, copy the data
+            // different device, copy the data
             *this = other;
         }
         return *this;
