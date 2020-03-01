@@ -255,12 +255,14 @@ template <typename MatrixData1, typename MatrixData2>
              << second_expression << " is " << err << "\n"
              << "\twhich is larger than " << tolerance_expression
              << " (which is " << tolerance << ")\n";
-        fail << first_expression << " is:\n";
-        detail::print_matrix(fail, first);
-        fail << second_expression << " is:\n";
-        detail::print_matrix(fail, second);
-        fail << "component-wise relative error is:\n";
-        detail::print_componentwise_error(fail, first, second);
+        if (num_rows * num_cols <= 1000) {
+            fail << first_expression << " is:\n";
+            detail::print_matrix(fail, first);
+            fail << second_expression << " is:\n";
+            detail::print_matrix(fail, second);
+            fail << "component-wise relative error is:\n";
+            detail::print_componentwise_error(fail, first, second);
+        }
         return fail;
     }
 }
