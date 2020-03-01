@@ -151,7 +151,7 @@ __device__ void group_merge(const ValueType *a, IndexType a_size,
     IndexType a_begin{};
     IndexType b_begin{};
     IndexType c_begin{};
-    auto lane = IndexType(group.thread_rank());
+    auto lane = static_cast<IndexType>(group.thread_rank());
     auto a_cur = detail::checked_load(a, a_begin + lane, a_size);
     auto b_cur = detail::checked_load(b, b_begin + lane, b_size);
     while (c_begin < c_size) {
