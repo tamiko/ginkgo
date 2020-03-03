@@ -54,15 +54,6 @@ struct merge_result {
 };
 
 
-template <typename ValueType, typename IndexType>
-__device__ ValueType
-checked_load(const ValueType *p, IndexType i, IndexType size,
-             ValueType sentinel = device_numeric_limits<ValueType>::max)
-{
-    return i < size ? p[i] : sentinel;
-}
-
-
 }  // namespace detail
 
 
@@ -152,8 +143,9 @@ __device__ void group_merge(const ValueType *a, IndexType a_size,
     IndexType b_begin{};
     IndexType c_begin{};
     auto lane = static_cast<IndexType>(group.thread_rank());
-    auto a_cur = detail::checked_load(a, a_begin + lane, a_size);
-    auto b_cur = detail::checked_load(b, b_begin + lane, b_size);
+    constexpr auto sentinel = device_numeric_limits<IndexType>::max;
+    auto a_cur = checked_load(a, a_begin + lane, a_size, sentinel);
+    auto b_cur = checked_load(b, b_begin + lane, b_size, sentinel);
     while (c_begin < c_size) {
         auto merge_result = group_merge_step<group_size>(a_cur, b_cur, group);
         merge_fn(merge_result.a_idx + a_begin, merge_result.a_val,
@@ -183,7 +175,7 @@ __device__ void group_merge(const ValueType *a, IndexType a_size,
         auto load_size = load_a ? a_size : b_size;
 
         auto load_idx = load_begin + load_lane;
-        auto loaded = detail::checked_load(load_source, load_idx, load_size);
+        auto loaded = checked_load(load_source, load_idx, load_size, sentinel);
         // shuffle the `a` values to the end of the warp
         auto lower_loaded = group.shfl_up(loaded, b_advance);
         a_cur = lane < b_advance ? a_cur : lower_loaded;
@@ -217,8 +209,9 @@ __device__ void sequential_merge(const ValueType *a, IndexType a_size,
     IndexType a_begin{};
     IndexType b_begin{};
     IndexType c_begin{};
-    auto a_cur = detail::checked_load(a, a_begin, a_size);
-    auto b_cur = detail::checked_load(b, b_begin, b_size);
+    constexpr auto sentinel = device_numeric_limits<IndexType>::max;
+    auto a_cur = checked_load(a, a_begin, a_size, sentinel);
+    auto b_cur = checked_load(b, b_begin, b_size, sentinel);
     while (c_begin < c_size) {
         merge_fn(a_begin, a_cur, b_begin, b_cur, c_begin);
         auto a_advance = a_cur < b_cur;
@@ -230,7 +223,7 @@ __device__ void sequential_merge(const ValueType *a, IndexType a_size,
         auto load = a_advance ? a : b;
         auto load_size = a_advance ? a_size : b_size;
         auto load_idx = a_advance ? a_begin : b_begin;
-        auto loaded = detail::checked_load(load, load_idx, load_size);
+        auto loaded = checked_load(load, load_idx, load_size, sentinel);
         a_cur = a_advance ? loaded : a_cur;
         b_cur = b_advance ? loaded : b_cur;
     }

@@ -89,34 +89,11 @@ using compiled_kernels =
 template <typename ValueType, typename IndexType>
 void ssss_count(const ValueType *values, IndexType size,
                 remove_complex<ValueType> *tree, unsigned char *oracles,
-                IndexType *partial_counts, IndexType *total_counts)
-{
-    constexpr auto bucket_count = kernel::searchtree_width;
-    auto num_threads_total = ceildiv(size, items_per_thread);
-    auto num_blocks =
-        static_cast<IndexType>(ceildiv(num_threads_total, default_block_size));
-    // pick sample, build searchtree
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel::build_searchtree), dim3(1),
-                       dim3(bucket_count), 0, 0, as_hip_type(values), size,
-                       tree);
-    // determine bucket sizes
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel::count_buckets), dim3(num_blocks),
-                       dim3(default_block_size), 0, 0, as_hip_type(values),
-                       size, tree, partial_counts, oracles, items_per_thread);
-    // compute prefix sum and total sum over block-local values
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel::block_prefix_sum),
-                       dim3(bucket_count), dim3(default_block_size), 0, 0,
-                       partial_counts, total_counts, num_blocks);
-    // compute prefix sum over bucket counts
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(start_prefix_sum<bucket_count>), dim3(1),
-                       dim3(bucket_count), 0, 0, bucket_count, total_counts,
-                       total_counts + bucket_count);
-}
+                IndexType *partial_counts, IndexType *total_counts);
+// instantiated in par_ilut_select_kernel.hip.cpp
 
 
 namespace {
-
-
 template <int subwarp_size, typename ValueType, typename IndexType>
 void threshold_filter_approx(syn::value_list<int, subwarp_size>,
                              std::shared_ptr<const DefaultExecutor> exec,

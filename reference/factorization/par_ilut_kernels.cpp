@@ -44,6 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ginkgo/core/matrix/dense.hpp>
 
 
+#include "core/base/utils.hpp"
 #include "core/components/prefix_sum.hpp"
 #include "core/matrix/coo_builder.hpp"
 #include "core/matrix/csr_builder.hpp"
@@ -323,7 +324,7 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
     auto u_vals = u->get_const_values();
     auto l_new_row_ptrs = l_new->get_row_ptrs();
     auto u_new_row_ptrs = u_new->get_row_ptrs();
-    auto sentinel = std::numeric_limits<IndexType>::max();
+    constexpr auto sentinel = std::numeric_limits<IndexType>::max();
     // count nnz
     IndexType l_row_nnz{};
     IndexType u_row_nnz{};
@@ -335,10 +336,15 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
         auto lu_begin = lu_row_ptrs[row];
         auto lu_end = lu_row_ptrs[row + 1];
         auto total_size = (a_end - a_begin) + (lu_end - lu_begin);
+        bool skip{};
         for (IndexType i = 0; i < total_size; ++i) {
+            if (skip) {
+                skip = false;
+                continue;
+            }
             // load column indices or sentinel
-            auto a_col = a_begin < a_end ? a_col_idxs[a_begin] : sentinel;
-            auto lu_col = lu_begin < lu_end ? lu_col_idxs[lu_begin] : sentinel;
+            auto a_col = checked_load(a_col_idxs, a_begin, a_end, sentinel);
+            auto lu_col = checked_load(lu_col_idxs, lu_begin, lu_end, sentinel);
             auto r_col = min(a_col, lu_col);
             // increment row nnz
             l_row_nnz += r_col <= row;
@@ -346,7 +352,7 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
             // advance indices
             a_begin += (a_col <= lu_col);
             lu_begin += (lu_col <= a_col);
-            i += (a_col == lu_col);
+            skip = a_col == lu_col;
         }
     }
     l_new_row_ptrs[num_rows] = l_row_nnz;
@@ -380,10 +386,15 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
         auto u_nz = u_new_row_ptrs[row];
         auto finished_l = l_begin == l_end;
         auto total_size = (a_end - a_begin) + (lu_end - lu_begin);
+        bool skip{};
         for (IndexType i = 0; i < total_size; ++i) {
+            if (skip) {
+                skip = false;
+                continue;
+            }
             // load column indices or sentinel
-            auto a_col = a_begin < a_end ? a_col_idxs[a_begin] : sentinel;
-            auto lu_col = lu_begin < lu_end ? lu_col_idxs[lu_begin] : sentinel;
+            auto a_col = checked_load(a_col_idxs, a_begin, a_end, sentinel);
+            auto lu_col = checked_load(lu_col_idxs, lu_begin, lu_end, sentinel);
             auto r_col = min(a_col, lu_col);
             // load corresponding values or zero
             auto a_val = a_col <= lu_col ? a_vals[a_begin] : zero<ValueType>();
@@ -392,10 +403,10 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
             auto r_val = a_val - lu_val;
             // load matching entry of L + U
             auto lpu_col =
-                finished_l ? (u_begin < u_end ? u_col_idxs[u_begin] : sentinel)
+                finished_l ? checked_load(u_col_idxs, u_begin, u_end, sentinel)
                            : l_col_idxs[l_begin];
-            auto lpu_val = finished_l ? (u_begin < u_end ? u_vals[u_begin]
-                                                         : zero<ValueType>())
+            auto lpu_val = finished_l ? checked_load(u_vals, u_begin, u_end,
+                                                     zero<ValueType>())
                                       : l_vals[l_begin];
             // load diagonal entry of U for lower diagonal entries
             auto diag =
@@ -417,7 +428,7 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
             // advance indices
             a_begin += (a_col <= lu_col);
             lu_begin += (lu_col <= a_col);
-            i += (a_col == lu_col);
+            skip = a_col == lu_col;
             // advance entry of L + U if we used it
             if (finished_l) {
                 u_begin += (lpu_col == r_col);

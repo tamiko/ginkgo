@@ -30,27 +30,27 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#ifndef GKO_HIP_COMPONENTS_MERGING_HIP_HPP_
-#define GKO_HIP_COMPONENTS_MERGING_HIP_HPP_
+#ifndef GKO_INTERNAL_CORE_BASE_UTILS_HPP_
+#define GKO_INTERNAL_CORE_BASE_UTILS_HPP_
 
-
-#include "core/base/utils.hpp"
-#include "hip/base/math.hip.hpp"
-#include "hip/components/intrinsics.hip.hpp"
-#include "hip/components/searching.hip.hpp"
+#include <ginkgo/core/base/types.hpp>
 
 
 namespace gko {
 namespace kernels {
-namespace hip {
 
 
-#include "common/components/merging.hpp.inc"
+template <typename ValueType, typename IndexType>
+GKO_ATTRIBUTES GKO_INLINE ValueType checked_load(const ValueType *p,
+                                                 IndexType i, IndexType size,
+                                                 ValueType sentinel)
+{
+    return i < size ? p[i] : sentinel;
+}
 
 
-}  // namespace hip
 }  // namespace kernels
 }  // namespace gko
 
 
-#endif  // GKO_HIP_COMPONENTS_MERGING_HIP_HPP_
+#endif  // GKO_INTERNAL_CORE_BASE_UTILS_HPP_

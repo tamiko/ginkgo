@@ -86,26 +86,8 @@ using compiled_kernels =
 template <typename ValueType, typename IndexType>
 void ssss_count(const ValueType *values, IndexType size,
                 remove_complex<ValueType> *tree, unsigned char *oracles,
-                IndexType *partial_counts, IndexType *total_counts)
-{
-    constexpr auto bucket_count = kernel::searchtree_width;
-    auto num_threads_total = ceildiv(size, items_per_thread);
-    auto num_blocks =
-        static_cast<IndexType>(ceildiv(num_threads_total, default_block_size));
-    // pick sample, build searchtree
-    kernel::build_searchtree<<<1, bucket_count>>>(as_cuda_type(values), size,
-                                                  tree);
-    // determine bucket sizes
-    kernel::count_buckets<<<num_blocks, default_block_size>>>(
-        as_cuda_type(values), size, tree, partial_counts, oracles,
-        items_per_thread);
-    // compute prefix sum and total sum over block-local values
-    kernel::block_prefix_sum<<<bucket_count, default_block_size>>>(
-        partial_counts, total_counts, num_blocks);
-    // compute prefix sum over bucket counts
-    start_prefix_sum<bucket_count><<<1, bucket_count>>>(
-        bucket_count, total_counts, total_counts + bucket_count);
-}
+                IndexType *partial_counts, IndexType *total_counts);
+// instantiated in par_ilut_select_kernel.cu
 
 
 namespace {

@@ -156,16 +156,16 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
     IndexType l_new_begin = l_new_row_ptrs[row];
     IndexType u_new_begin = u_new_row_ptrs[row];
 
-    auto a_col = detail::checked_load(a_col_idxs, a_begin + lane, a_end);
-    auto a_val =
-        detail::checked_load(a_vals, a_begin + lane, a_end, zero<ValueType>());
-    auto lu_col = detail::checked_load(lu_col_idxs, lu_begin + lane, lu_end);
-    auto lu_val = detail::checked_load(lu_vals, lu_begin + lane, lu_end,
-                                       zero<ValueType>());
+    constexpr auto sentinel = device_numeric_limits<IndexType>::max;
+    auto a_col = checked_load(a_col_idxs, a_begin + lane, a_end, sentinel);
+    auto a_val = checked_load(a_vals, a_begin + lane, a_end, zero<ValueType>());
+    auto lu_col = checked_load(lu_col_idxs, lu_begin + lane, lu_end, sentinel);
+    auto lu_val =
+        checked_load(lu_vals, lu_begin + lane, lu_end, zero<ValueType>());
     auto lpu_col =
-        detail::checked_load(lpu_col_idxs, lpu_begin + lane, lpu_end);
-    auto lpu_val = detail::checked_load(lpu_vals, lpu_begin + lane, lpu_end,
-                                        zero<ValueType>());
+        checked_load(lpu_col_idxs, lpu_begin + lane, lpu_end, sentinel);
+    auto lpu_val =
+        checked_load(lpu_vals, lpu_begin + lane, lpu_end, zero<ValueType>());
     bool skip_first{};
     while (out_begin < out_size) {
         auto merge_result =
@@ -254,9 +254,9 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
 
         auto load_idx = load_begin + load_lane;
         auto loaded_col =
-            detail::checked_load(load_source_col, load_idx, load_end);
-        auto loaded_val = detail::checked_load(load_source_val, load_idx,
-                                               load_end, zero<ValueType>());
+            checked_load(load_source_col, load_idx, load_end, sentinel);
+        auto loaded_val = checked_load(load_source_val, load_idx, load_end,
+                                       zero<ValueType>());
         // shuffle the `a` values to the end of the warp
         auto lower_loaded_col = subwarp.shfl_up(loaded_col, lu_advance);
         auto lower_loaded_val = subwarp.shfl_up(loaded_val, lu_advance);
@@ -276,9 +276,9 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
                 lpu_col_idxs = u_col_idxs + u_begin - l_end;
                 lpu_vals = u_vals + u_begin - l_end;
             }
-            lpu_col = detail::checked_load(lpu_col_idxs, lpu_idx, lpu_end);
-            lpu_val = detail::checked_load(lpu_vals, lpu_idx, lpu_end,
-                                           zero<ValueType>());
+            lpu_col = checked_load(lpu_col_idxs, lpu_idx, lpu_end, sentinel);
+            lpu_val =
+                checked_load(lpu_vals, lpu_idx, lpu_end, zero<ValueType>());
         }
     }
 }
@@ -331,6 +331,7 @@ __global__
     auto a_col = a_col_idxs[a_begin];
     auto lu_col = lu_col_idxs[lu_begin];
     auto lpu_col = lpu_col_idxs[lpu_begin];
+    constexpr auto sentinel = device_numeric_limits<IndexType>::max;
     while (out_begin < out_size) {
         auto out_col = min(min(a_col, lu_col), lpu_col);
         auto a_advance = out_col == a_col;
@@ -367,13 +368,13 @@ __global__
 
         // load new elements if necessary
         if (a_advance) {
-            a_col = detail::checked_load(a_col_idxs, a_begin, a_end);
+            a_col = checked_load(a_col_idxs, a_begin, a_end, sentinel);
         }
         if (lu_advance) {
-            lu_col = detail::checked_load(lu_col_idxs, lu_begin, lu_end);
+            lu_col = checked_load(lu_col_idxs, lu_begin, lu_end, sentinel);
         }
         if (lpu_advance) {
-            lu_col = detail::checked_load(lpu_col_idxs, lpu_begin, lpu_end);
+            lu_col = checked_load(lpu_col_idxs, lpu_begin, lpu_end, sentinel);
         }
     }
 }
