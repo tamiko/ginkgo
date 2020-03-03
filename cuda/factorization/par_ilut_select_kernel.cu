@@ -47,7 +47,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cuda/components/atomic.cuh"
 #include "cuda/components/intrinsics.cuh"
 #include "cuda/components/prefix_sum.cuh"
+#include "cuda/components/searching.cuh"
 #include "cuda/components/sorting.cuh"
+#include "cuda/factorization/par_ilut_select_common.cuh"
 
 
 namespace gko {
@@ -107,6 +109,18 @@ void ssss_filter(const ValueType *values, IndexType size,
 }
 
 
+template <typename IndexType>
+ssss_bucket<IndexType> ssss_find_bucket(
+    std::shared_ptr<const DefaultExecutor> exec, IndexType *prefix_sum,
+    IndexType rank)
+{
+    kernel::find_bucket<<<1, config::warp_size>>>(prefix_sum, rank);
+    IndexType values[3]{};
+    exec->get_master()->copy_from(exec.get(), 3, prefix_sum, values);
+    return {values[0], values[1], values[2]};
+}
+
+
 template <typename ValueType, typename IndexType>
 void threshold_select(std::shared_ptr<const DefaultExecutor> exec,
                       const matrix::Csr<ValueType, IndexType> *m,
@@ -148,54 +162,42 @@ void threshold_select(std::shared_ptr<const DefaultExecutor> exec,
     ssss_count(values, size, tree, oracles, partial_counts, total_counts);
 
     // determine bucket with correct rank
-    auto total_counts_array =
-        Array<IndexType>::view(exec, bucket_count + 1, total_counts);
-    Array<IndexType> splitter_ranks_array(exec->get_master(),
-                                          total_counts_array);
-    auto splitter_ranks = splitter_ranks_array.get_const_data();
-    auto it = std::upper_bound(splitter_ranks,
-                               splitter_ranks + bucket_count + 1, rank);
-    auto bucket = static_cast<IndexType>(std::distance(splitter_ranks + 1, it));
-    auto bucket_size = splitter_ranks[bucket + 1] - splitter_ranks[bucket];
-    rank -= splitter_ranks[bucket];
+    auto bucket = ssss_find_bucket(exec, total_counts, rank);
+    rank -= bucket.begin;
 
-    if (bucket_size * 2 > tmp_size_vals) {
+    if (bucket.size * 2 > tmp_size_vals) {
         // we need to reallocate tmp2
-        tmp2.resize_and_reset(bucket_size * 2);
+        tmp2.resize_and_reset(bucket.size * 2);
     }
     auto tmp21 = tmp2.get_data();
-    auto tmp22 = tmp2.get_data() + bucket_size;
+    auto tmp22 = tmp2.get_data() + bucket.size;
     // extract target bucket
-    ssss_filter(values, size, oracles, partial_counts, bucket, tmp22);
+    ssss_filter(values, size, oracles, partial_counts, bucket.idx, tmp22);
 
     // recursively select from smaller buckets
     int step{};
-    while (bucket_size > kernel::basecase_size) {
+    while (bucket.size > kernel::basecase_size) {
         std::swap(tmp21, tmp22);
         const auto *tmp_in = tmp21;
         auto tmp_out = tmp22;
 
-        ssss_count(tmp_in, bucket_size, tree, oracles, partial_counts,
+        ssss_count(tmp_in, bucket.size, tree, oracles, partial_counts,
                    total_counts);
-        splitter_ranks_array = total_counts_array;
-        splitter_ranks = splitter_ranks_array.get_const_data();
-        auto it = std::upper_bound(splitter_ranks,
-                                   splitter_ranks + bucket_count + 1, rank);
-        bucket = static_cast<IndexType>(std::distance(splitter_ranks + 1, it));
-        ssss_filter(tmp_in, bucket_size, oracles, partial_counts, bucket,
+        auto new_bucket = ssss_find_bucket(exec, total_counts, rank);
+        ssss_filter(tmp_in, bucket.size, oracles, partial_counts, bucket.idx,
                     tmp_out);
 
-        rank -= splitter_ranks[bucket];
-        bucket_size = splitter_ranks[bucket + 1] - splitter_ranks[bucket];
+        rank -= new_bucket.begin;
+        bucket.size = new_bucket.size;
         // we should never need more than 5 recursion steps, this would mean
         // 256^5 = 2^40. fall back to standard library algorithm in that case.
         ++step;
         if (step > 5) {
             Array<AbsType> cpu_out_array{
                 exec->get_master(),
-                Array<AbsType>::view(exec, bucket_size, tmp_out)};
+                Array<AbsType>::view(exec, bucket.size, tmp_out)};
             auto begin = cpu_out_array.get_data();
-            auto end = begin + bucket_size;
+            auto end = begin + bucket.size;
             auto middle = begin + rank;
             std::nth_element(begin, middle, end);
             threshold = *middle;
@@ -206,7 +208,7 @@ void threshold_select(std::shared_ptr<const DefaultExecutor> exec,
     // base case
     auto out_ptr = reinterpret_cast<AbsType *>(tmp1.get_data());
     kernel::basecase_select<<<1, kernel::basecase_block_size>>>(
-        tmp22, bucket_size, rank, out_ptr);
+        tmp22, bucket.size, rank, out_ptr);
     exec->get_master()->copy_from(exec.get(), 1, out_ptr, &threshold);
 }
 

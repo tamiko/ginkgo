@@ -60,6 +60,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "hip/components/intrinsics.hip.hpp"
 #include "hip/components/prefix_sum.hip.hpp"
 #include "hip/components/sorting.hip.hpp"
+#include "hip/factorization/par_ilut_select_common.hip.hpp"
 
 
 namespace gko {
@@ -84,13 +85,6 @@ using compiled_kernels =
 
 #include "common/factorization/par_ilut_filter_kernels.hpp.inc"
 #include "common/factorization/par_ilut_select_kernels.hpp.inc"
-
-
-template <typename ValueType, typename IndexType>
-void ssss_count(const ValueType *values, IndexType size,
-                remove_complex<ValueType> *tree, unsigned char *oracles,
-                IndexType *partial_counts, IndexType *total_counts);
-// instantiated in par_ilut_select_kernel.hip.cpp
 
 
 namespace {
@@ -133,15 +127,8 @@ void threshold_filter_approx(syn::value_list<int, subwarp_size>,
     ssss_count(values, size, tree, oracles, partial_counts, total_counts);
 
     // determine bucket with correct rank
-    auto total_counts_array =
-        Array<IndexType>::view(exec, bucket_count + 1, total_counts);
-    Array<IndexType> splitter_ranks_array(exec->get_master(),
-                                          total_counts_array);
-    auto splitter_ranks = splitter_ranks_array.get_const_data();
-    auto it = std::upper_bound(splitter_ranks,
-                               splitter_ranks + bucket_count + 1, rank);
-    auto bucket =
-        static_cast<unsigned char>(std::distance(splitter_ranks + 1, it));
+    auto bucket = static_cast<unsigned char>(
+        ssss_find_bucket(exec, total_counts, rank).idx);
 
     // filter the elements
     auto old_row_ptrs = m->get_const_row_ptrs();

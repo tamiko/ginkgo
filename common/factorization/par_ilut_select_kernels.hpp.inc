@@ -244,4 +244,25 @@ __global__ __launch_bounds__(basecase_block_size) void basecase_select(
     }
 }
 
+
+template <typename IndexType>
+__global__ __launch_bounds__(config::warp_size) void find_bucket(
+    IndexType *prefix_sum, IndexType rank)
+{
+    auto warp =
+        group::tiled_partition<config::warp_size>(group::this_thread_block());
+    auto idx = group_wide_search(0, searchtree_width, warp, [&](int i) {
+        return prefix_sum[i + 1] > rank;
+    });
+    if (warp.thread_rank() == 0) {
+        auto base = prefix_sum[idx];
+        auto size = prefix_sum[idx + 1] - base;
+        // don't overwrite anything before having loaded everything!
+        prefix_sum[0] = idx;
+        prefix_sum[1] = base;
+        prefix_sum[2] = size;
+    }
+}
+
+
 }  // namespace kernel
