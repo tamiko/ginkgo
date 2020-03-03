@@ -300,6 +300,57 @@ GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
     GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS);
 
 
+template <typename ValueType, typename IndexType, typename BeginCallback,
+          typename EntryCallback, typename EndCallback>
+void abstract_spgeam(const matrix::Csr<ValueType, IndexType> *a,
+                     const matrix::Csr<ValueType, IndexType> *b,
+                     BeginCallback begin_cb, EntryCallback entry_cb,
+                     EndCallback end_cb)
+{
+    auto num_rows = a->get_size()[0];
+    auto a_row_ptrs = a->get_const_row_ptrs();
+    auto a_col_idxs = a->get_const_col_idxs();
+    auto a_vals = a->get_const_values();
+    auto b_row_ptrs = b->get_const_row_ptrs();
+    auto b_col_idxs = b->get_const_col_idxs();
+    auto b_vals = b->get_const_values();
+    constexpr auto sentinel = std::numeric_limits<IndexType>::max();
+    for (size_type row = 0; row < num_rows; ++row) {
+        IndexType l_row_nnz{};
+        IndexType u_row_nnz{};
+        auto a_begin = a_row_ptrs[row];
+        auto a_end = a_row_ptrs[row + 1];
+        auto b_begin = b_row_ptrs[row];
+        auto b_end = b_row_ptrs[row + 1];
+        auto total_size = (a_end - a_begin) + (b_end - b_begin);
+        bool skip{};
+        auto local_data = begin_cb(row);
+        for (IndexType i = 0; i < total_size; ++i) {
+            if (skip) {
+                skip = false;
+                continue;
+            }
+            // load column indices or sentinel
+            auto a_col = checked_load(a_col_idxs, a_begin, a_end, sentinel);
+            auto b_col = checked_load(b_col_idxs, b_begin, b_end, sentinel);
+            auto a_val =
+                checked_load(a_vals, a_begin, a_end, zero<ValueType>());
+            auto b_val =
+                checked_load(b_vals, b_begin, b_end, zero<ValueType>());
+            auto col = min(a_col, b_col);
+            // callback
+            entry_cb(row, col, a_col == col ? a_val : zero<ValueType>(),
+                     b_col == col ? b_val : zero<ValueType>(), local_data);
+            // advance indices
+            a_begin += (a_col <= b_col);
+            b_begin += (b_col <= a_col);
+            skip = a_col == b_col;
+        }
+        end_cb(row, local_data);
+    }
+}
+
+
 template <typename ValueType, typename IndexType>
 void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
                     const matrix::Csr<ValueType, IndexType> *lu,
@@ -310,12 +361,6 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
                     matrix::Csr<ValueType, IndexType> *u_new)
 {
     auto num_rows = a->get_size()[0];
-    auto a_row_ptrs = a->get_const_row_ptrs();
-    auto a_col_idxs = a->get_const_col_idxs();
-    auto a_vals = a->get_const_values();
-    auto lu_row_ptrs = lu->get_const_row_ptrs();
-    auto lu_col_idxs = lu->get_const_col_idxs();
-    auto lu_vals = lu->get_const_values();
     auto l_row_ptrs = l->get_const_row_ptrs();
     auto l_col_idxs = l->get_const_col_idxs();
     auto l_vals = l->get_const_values();
@@ -326,41 +371,24 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
     auto u_new_row_ptrs = u_new->get_row_ptrs();
     constexpr auto sentinel = std::numeric_limits<IndexType>::max();
     // count nnz
-    IndexType l_row_nnz{};
-    IndexType u_row_nnz{};
-    for (size_type row = 0; row < num_rows; ++row) {
-        l_new_row_ptrs[row] = l_row_nnz;
-        u_new_row_ptrs[row] = u_row_nnz;
-        auto a_begin = a_row_ptrs[row];
-        auto a_end = a_row_ptrs[row + 1];
-        auto lu_begin = lu_row_ptrs[row];
-        auto lu_end = lu_row_ptrs[row + 1];
-        auto total_size = (a_end - a_begin) + (lu_end - lu_begin);
-        bool skip{};
-        for (IndexType i = 0; i < total_size; ++i) {
-            if (skip) {
-                skip = false;
-                continue;
-            }
-            // load column indices or sentinel
-            auto a_col = checked_load(a_col_idxs, a_begin, a_end, sentinel);
-            auto lu_col = checked_load(lu_col_idxs, lu_begin, lu_end, sentinel);
-            auto r_col = min(a_col, lu_col);
-            // increment row nnz
-            l_row_nnz += r_col <= row;
-            u_row_nnz += r_col >= row;
-            // advance indices
-            a_begin += (a_col <= lu_col);
-            lu_begin += (lu_col <= a_col);
-            skip = a_col == lu_col;
-        }
-    }
-    l_new_row_ptrs[num_rows] = l_row_nnz;
-    u_new_row_ptrs[num_rows] = u_row_nnz;
+    IndexType l_nnz{};
+    IndexType u_nnz{};
+    abstract_spgeam(
+        a, lu,
+        [&](IndexType row) {
+            l_new_row_ptrs[row] = l_nnz;
+            u_new_row_ptrs[row] = u_nnz;
+            return 0;
+        },
+        [&](IndexType row, IndexType col, ValueType, ValueType, int) {
+            l_nnz += col <= row;
+            u_nnz += col >= row;
+        },
+        [](IndexType row, int) {});
+    l_new_row_ptrs[num_rows] = l_nnz;
+    u_new_row_ptrs[num_rows] = u_nnz;
 
     // resize arrays
-    auto l_nnz = l_new_row_ptrs[num_rows];
-    auto u_nnz = u_new_row_ptrs[num_rows];
     matrix::CsrBuilder<ValueType, IndexType> l_builder{l_new};
     matrix::CsrBuilder<ValueType, IndexType> u_builder{u_new};
     l_builder.get_col_idx_array().resize_and_reset(l_nnz);
@@ -373,71 +401,66 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
     auto u_new_vals = u_new->get_values();
 
     // accumulate non-zeros
-    for (size_type row = 0; row < num_rows; ++row) {
-        auto a_begin = a_row_ptrs[row];
-        auto a_end = a_row_ptrs[row + 1];
-        auto lu_begin = lu_row_ptrs[row];
-        auto lu_end = lu_row_ptrs[row + 1];
-        auto l_begin = l_row_ptrs[row];
-        auto l_end = l_row_ptrs[row + 1] - 1;  // skip diagonal
-        auto u_begin = u_row_ptrs[row];
-        auto u_end = u_row_ptrs[row + 1];
-        auto l_nz = l_new_row_ptrs[row];
-        auto u_nz = u_new_row_ptrs[row];
-        auto finished_l = l_begin == l_end;
-        auto total_size = (a_end - a_begin) + (lu_end - lu_begin);
-        bool skip{};
-        for (IndexType i = 0; i < total_size; ++i) {
-            if (skip) {
-                skip = false;
-                continue;
-            }
-            // load column indices or sentinel
-            auto a_col = checked_load(a_col_idxs, a_begin, a_end, sentinel);
-            auto lu_col = checked_load(lu_col_idxs, lu_begin, lu_end, sentinel);
-            auto r_col = min(a_col, lu_col);
-            // load corresponding values or zero
-            auto a_val = a_col <= lu_col ? a_vals[a_begin] : zero<ValueType>();
-            auto lu_val =
-                lu_col <= a_col ? lu_vals[lu_begin] : zero<ValueType>();
+    struct row_state {
+        IndexType l_new_nz;
+        IndexType u_new_nz;
+        IndexType l_old_begin;
+        IndexType l_old_end;
+        IndexType u_old_begin;
+        IndexType u_old_end;
+        bool finished_l;
+    };
+    abstract_spgeam(
+        a, lu,
+        [&](IndexType row) {
+            row_state state{};
+            state.l_new_nz = l_new_row_ptrs[row];
+            state.u_new_nz = u_new_row_ptrs[row];
+            state.l_old_begin = l_row_ptrs[row];
+            state.l_old_end = l_row_ptrs[row + 1] - 1;  // skip diagonal
+            state.u_old_begin = u_row_ptrs[row];
+            state.u_old_end = u_row_ptrs[row + 1];
+            state.finished_l = (state.l_old_begin == state.l_old_end);
+            return state;
+        },
+        [&](IndexType row, IndexType col, ValueType a_val, ValueType lu_val,
+            row_state &state) {
             auto r_val = a_val - lu_val;
             // load matching entry of L + U
-            auto lpu_col =
-                finished_l ? checked_load(u_col_idxs, u_begin, u_end, sentinel)
-                           : l_col_idxs[l_begin];
-            auto lpu_val = finished_l ? checked_load(u_vals, u_begin, u_end,
-                                                     zero<ValueType>())
-                                      : l_vals[l_begin];
+            auto lpu_col = state.finished_l
+                               ? checked_load(u_col_idxs, state.u_old_begin,
+                                              state.u_old_end, sentinel)
+                               : l_col_idxs[state.l_old_begin];
+            auto lpu_val =
+                state.finished_l
+                    ? checked_load(u_vals, state.u_old_begin, state.u_old_end,
+                                   zero<ValueType>())
+                    : l_vals[state.l_old_begin];
             // load diagonal entry of U for lower diagonal entries
-            auto diag =
-                r_col < row ? u_vals[u_row_ptrs[r_col]] : one<ValueType>();
+            auto diag = col < row ? u_vals[u_row_ptrs[col]] : one<ValueType>();
             // if there is already an entry present, use that instead.
-            auto out_val = lpu_col == r_col ? lpu_val : r_val / diag;
+            auto out_val = lpu_col == col ? lpu_val : r_val / diag;
             // store output entries
-            if (row >= r_col) {
-                l_new_col_idxs[l_nz] = r_col;
-                l_new_vals[l_nz] = row == r_col ? one<ValueType>() : out_val;
-                l_nz++;
+            if (row >= col) {
+                l_new_col_idxs[state.l_new_nz] = col;
+                l_new_vals[state.l_new_nz] =
+                    row == col ? one<ValueType>() : out_val;
+                state.l_new_nz++;
             }
-            if (row <= r_col) {
-                u_new_col_idxs[u_nz] = r_col;
-                u_new_vals[u_nz] = out_val;
-                ++u_nz;
+            if (row <= col) {
+                u_new_col_idxs[state.u_new_nz] = col;
+                u_new_vals[state.u_new_nz] = out_val;
+                state.u_new_nz++;
             }
-
-            // advance indices
-            a_begin += (a_col <= lu_col);
-            lu_begin += (lu_col <= a_col);
-            skip = a_col == lu_col;
             // advance entry of L + U if we used it
-            if (finished_l) {
-                u_begin += (lpu_col == r_col);
+            if (state.finished_l) {
+                state.u_old_begin += (lpu_col == col);
             } else {
-                l_begin += (lpu_col == r_col);
-                finished_l = (l_begin == l_end);
+                state.l_old_begin += (lpu_col == col);
+                state.finished_l = (state.l_old_begin == state.l_old_end);
             }
-        }
-    }
+        },
+        [](IndexType, row_state) {});
 }
 
 
