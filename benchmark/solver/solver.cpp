@@ -61,10 +61,10 @@ DEFINE_string(solvers, "cg",
               "A comma-separated list of solvers to run."
               "Supported values are: bicgstab, cg, cgs, fcg, gmres");
 
-DEFINE_string(
-    preconditioners, "none",
-    "A comma-separated list of preconditioners to use."
-    "Supported values are: none, jacobi, adaptive-jacobi, parilu, ilu");
+DEFINE_string(preconditioners, "none",
+              "A comma-separated list of preconditioners to use."
+              "Supported values are: none, jacobi, adaptive-jacobi, parilu, "
+              "parilut, ilu");
 
 DEFINE_uint32(
     nrhs, 1,
@@ -72,7 +72,8 @@ DEFINE_uint32(
 
 
 // input validation
-[[noreturn]] void print_config_error_and_exit() {
+[[noreturn]] void print_config_error_and_exit()
+{
     std::cerr << "Input has to be a JSON array of matrix configurations:\n"
               << "  [\n"
               << "    { \"filename\": \"my_file.mtx\",  \"optimal\": { "
@@ -183,6 +184,15 @@ const std::map<std::string, std::function<std::unique_ptr<gko::LinOpFactory>(
                              gko::preconditioner::Ilu<>::build()
                                  .with_factorization_factory(fact)
                                  .on(exec);
+                         return std::unique_ptr<ReferenceFactoryWrapper>(
+                             new ReferenceFactoryWrapper(f));
+                     }},
+                    {"parilut",
+                     [](std::shared_ptr<const gko::Executor> exec) {
+                         auto fact = std::shared_ptr<gko::LinOpFactory>(
+                             gko::factorization::ParIlut<>::build().on(exec));
+                         std::shared_ptr<const gko::LinOpFactory> f =
+                             gko::preconditioner::Ilu<>::build().on(exec);
                          return std::unique_ptr<ReferenceFactoryWrapper>(
                              new ReferenceFactoryWrapper(f));
                      }},

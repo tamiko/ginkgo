@@ -126,12 +126,10 @@ public:
     GKO_CREATE_FACTORY_PARAMETERS(parameters, Factory)
     {
         /**
-         * The number of iterations the `compute` kernel will use when doing
-         * the factorization. The default value `0` means `Auto`, so the
-         * implementation decides on the actual value depending on the
-         * ressources that are available.
+         * The number of total iterations of ParILUT that will be executed.
+         * The default value is 10.
          */
-        size_type GKO_FACTORY_PARAMETER(iterations, 0);
+        size_type GKO_FACTORY_PARAMETER(iterations, 10);
 
         /**
          * @brief `true` means it is known that the matrix given to this
