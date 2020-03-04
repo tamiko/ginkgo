@@ -150,7 +150,19 @@ std::string encode_parameters(const char *precond_name)
                  << FLAGS_storage_optimization;
              return oss.str();
          }},
-        {"parilu", [] { return std::string{"parilu"}; }},
+        {"parilu",
+         [] {
+             std::ostringstream oss;
+             oss << "parilu-" << FLAGS_num_iterations;
+             return oss.str();
+         }},
+        {"parilut",
+         [] {
+             std::ostringstream oss;
+             oss << "parilut-" << FLAGS_num_iterations << '-'
+                 << FLAGS_approx_select << '-' << FLAGS_fill_limit;
+             return oss.str();
+         }},
         {"ilu", [] { return std::string{"ilu"}; }}};
     return encoder[precond_name]();
 }
