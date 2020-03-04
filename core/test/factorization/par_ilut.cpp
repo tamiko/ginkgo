@@ -103,7 +103,7 @@ TEST_F(ParIlut, SetDefaults)
     auto factory = ilut_factory_type::build().on(ref);
 
     ASSERT_EQ(factory->get_parameters().skip_sorting, false);
-    ASSERT_EQ(factory->get_parameters().iterations, 0u);
+    ASSERT_EQ(factory->get_parameters().iterations, 10u);
     ASSERT_EQ(factory->get_parameters().approximate_select, true);
     ASSERT_EQ(factory->get_parameters().deterministic_sample, false);
     ASSERT_EQ(factory->get_parameters().fill_in_limit, 2.0);
