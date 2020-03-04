@@ -44,7 +44,8 @@ ginkgo_default_includes(ginkgo_mpi)
 ginkgo_install_library(ginkgo_mpi mpi)
 
 if(GINKGO_BUILD_TESTS)
-    add_subdirectory(test)
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/test)
+  add_subdirectory(test)
 endif()
 
 # Propagate some useful information

@@ -36,6 +36,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <gtest/gtest.h>
 
+#include "gtest-mpi-listener.hpp"
+#include "gtest-mpi-main.hpp"
 
 #include <mpi.h>
 
@@ -56,3 +58,8 @@ TEST(AssertNoMpiErrors, DoesNotThrowOnSuccess)
 
 
 }  // namespace
+
+
+// Calls a custom gtest main with MPI listeners. See gtest-mpi-listeners.hpp for
+// more details.
+GTEST_MPI_MAIN;

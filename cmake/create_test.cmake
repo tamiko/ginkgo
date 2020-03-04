@@ -97,7 +97,7 @@ function(ginkgo_create_metis_test test_name)
 endfunction(ginkgo_create_metis_test)
 
 
-function(ginkgo_create_mpi_test test_name)
+function(ginkgo_create_mpi_test test_name num_mpi_procs)
   file(RELATIVE_PATH REL_BINARY_DIR
     ${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR})
   string(REPLACE "/" "_" TEST_TARGET_NAME "${REL_BINARY_DIR}/${test_name}")
@@ -107,8 +107,10 @@ function(ginkgo_create_mpi_test test_name)
   set_target_properties(${TEST_TARGET_NAME} PROPERTIES
     OUTPUT_NAME ${test_name})
   target_link_libraries(${TEST_TARGET_NAME} PRIVATE ginkgo GTest::GTest GTest::Main ${ARGN} ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
-  set(MPI_COMMAND "${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS} ${TEST_TARGET_NAME} ${MPIEXEC_POSTFLAGS} -np 2")
-  add_test(NAME ${REL_BINARY_DIR}/${test_name} COMMAND ${MPI_COMMAND} )
+  message(STATUS "${TEST_TARGET_NAME}")
+  set(test_param ${MPIEXEC_NUMPROC_FLAG} ${num_mpi_procs} "${TEST_TARGET_NAME}")
+  add_test(NAME ${REL_BINARY_DIR}/${test_name}
+    COMMAND ${MPIEXEC} ${test_param})
 endfunction(ginkgo_create_mpi_test)
 
 function(ginkgo_create_cuda_test test_name)

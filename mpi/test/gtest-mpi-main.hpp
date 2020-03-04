@@ -30,73 +30,22 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#include <ginkgo/core/base/executor.hpp>
-
-
-#include <memory>
-#include <type_traits>
-
-
-#include <gtest/gtest.h>
-
-#include "gtest-mpi-listener.hpp"
-#include "gtest-mpi-main.hpp"
-
-#include <ginkgo/core/base/exception.hpp>
-#include <ginkgo/core/base/exception_helpers.hpp>
-
-
-#include <mpi.h>
-
-
-class MpiExecutor : public ::testing::Test {
-protected:
-    MpiExecutor() : mpi(nullptr) {}
-
-    void SetUp()
-    {
-        char **argv;
-        int argc = 0;
-        // mpi = gko::MpiExecutor::create();
-        mpi = gko::MpiExecutor::create(argc, argv, 1, true);
-    }
-
-    void TearDown()
-    {
-        if (mpi != nullptr) {
-            // ensure that previous calls finished and didn't throw an error
-            ASSERT_NO_THROW(mpi->synchronize());
-        }
-    }
-
-    std::shared_ptr<gko::MpiExecutor> mpi;
-};
-
-
-TEST_F(MpiExecutor, KnowsItsSize)
-{
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    EXPECT_EQ(mpi->get_num_ranks(), size);
-}
-
-
-TEST_F(MpiExecutor, KnowsItsRanks)
-{
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    EXPECT_EQ(rank, mpi->get_my_rank());
-}
-
-
-TEST_F(MpiExecutor, CanDetectInitialized)
-{
-    auto mpi2 = gko::MpiExecutor::create();
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    EXPECT_EQ(rank, mpi->get_my_rank());
-}
-
-// Calls a custom gtest main with MPI listeners. See gtest-mpi-listeners.hpp for
-// more details.
-GTEST_MPI_MAIN;
+#define GTEST_MPI_MAIN                                                       \
+    int main(int argc, char **argv)                                          \
+    {                                                                        \
+        ::testing::InitGoogleTest(&argc, argv);                              \
+        MPI_Init(&argc, &argv);                                              \
+        ::testing::AddGlobalTestEnvironment(                                 \
+            new GTestMPIListener::MPIEnvironment);                           \
+        ::testing::TestEventListeners &listeners =                           \
+            ::testing::UnitTest::GetInstance()->listeners();                 \
+        ::testing::TestEventListener *l =                                    \
+            listeners.Release(listeners.default_result_printer());           \
+        listeners.Append(                                                    \
+            new GTestMPIListener::MPIWrapperPrinter(l, MPI_COMM_WORLD));     \
+        int result = RUN_ALL_TESTS();                                        \
+        return 0;                                                            \
+    }                                                                        \
+    static_assert(true,                                                      \
+                  "This assert is used to counter the false positive extra " \
+                  "semi-colon warnings")
