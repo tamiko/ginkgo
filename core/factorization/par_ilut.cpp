@@ -140,7 +140,9 @@ class ParIlutState {
                  const CsrMatrix *system_matrix_in,
                  std::unique_ptr<CsrMatrix> l_in,
                  std::unique_ptr<CsrMatrix> u_in, IndexType l_nnz_limit,
-                 IndexType u_nnz_limit, bool use_approx_select)
+                 IndexType u_nnz_limit, bool use_approx_select,
+                 std::shared_ptr<typename CsrMatrix::strategy_type> l_strategy_,
+                 std::shared_ptr<typename CsrMatrix::strategy_type> u_strategy_)
         : exec{std::move(exec_in)},
           l_nnz_limit{l_nnz_limit},
           u_nnz_limit{u_nnz_limit},
@@ -149,7 +151,9 @@ class ParIlutState {
           l{std::move(l_in)},
           u{std::move(u_in)},
           selection_tmp{exec},
-          selection_tmp2{exec}
+          selection_tmp2{exec},
+          l_strategy{std::move(l_strategy_)},
+          u_strategy{std::move(u_strategy_)}
     {
         auto mtx_size = system_matrix->get_size();
         auto u_nnz = u->get_num_stored_elements();
@@ -158,6 +162,8 @@ class ParIlutState {
         l_new = CsrMatrix::create(exec, mtx_size);
         u_new = CsrMatrix::create(exec, mtx_size);
         u_new_csc = CsrMatrix::create(exec, mtx_size);
+        l_coo = CooMatrix::create(exec, mtx_size);
+        u_transp_coo = CooMatrix::create(exec, mtx_size);
         exec->run(make_csr_transpose(u.get(), u_csc.get()));
     }
 
@@ -245,7 +251,9 @@ ParIlut<ValueType, IndexType>::generate_l_u(
                                              std::move(u),
                                              l_nnz_limit,
                                              u_nnz_limit,
-                                             parameters_.approximate_select};
+                                             parameters_.approximate_select,
+                                             parameters_.l_strategy,
+                                             parameters_.u_strategy};
 
     for (size_type it = 0; it < parameters_.iterations; ++it) {
         state.iterate();
@@ -292,8 +300,8 @@ void ParIlutState<ValueType, IndexType>::iterate()
     exec->run(make_csr_transpose(u_new.get(), u_new_csc.get()));
 
     // convert l_new and u_new_csc into COO format
-    exec->run(make_convert_to_coo(l_coo.get(), l_new.get()));
-    exec->run(make_convert_to_coo(u_transp_coo.get(), u_new_csc.get()));
+    exec->run(make_convert_to_coo(l_new.get(), l_coo.get()));
+    exec->run(make_convert_to_coo(u_new_csc.get(), u_transp_coo.get()));
 
     // execute asynchronous iteration
     exec->run(make_compute_l_u_factors(system_matrix, l_new.get(), l_coo.get(),
