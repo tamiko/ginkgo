@@ -384,7 +384,7 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
             l_nnz += col <= row;
             u_nnz += col >= row;
         },
-        [](IndexType row, int) {});
+        [](IndexType, int) {});
     l_new_row_ptrs[num_rows] = l_nnz;
     u_new_row_ptrs[num_rows] = u_nnz;
 
