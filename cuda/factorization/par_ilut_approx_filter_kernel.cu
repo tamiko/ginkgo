@@ -84,16 +84,6 @@ using compiled_kernels =
 #include "common/factorization/par_ilut_select_kernels.hpp.inc"
 
 
-template <typename ValueType, typename IndexType>
-void ssss_count(const ValueType *values, IndexType size,
-                remove_complex<ValueType> *tree, unsigned char *oracles,
-                IndexType *partial_counts, IndexType *total_counts);
-// instantiated in par_ilut_select_kernel.cu
-
-
-namespace {
-
-
 template <int subwarp_size, typename ValueType, typename IndexType>
 void threshold_filter_approx(syn::value_list<int, subwarp_size>,
                              std::shared_ptr<const DefaultExecutor> exec,
@@ -184,9 +174,6 @@ void threshold_filter_approx(syn::value_list<int, subwarp_size>,
 
 GKO_ENABLE_IMPLEMENTATION_SELECTION(select_threshold_filter_approx,
                                     threshold_filter_approx);
-
-
-}  // namespace
 
 
 template <typename ValueType, typename IndexType>
