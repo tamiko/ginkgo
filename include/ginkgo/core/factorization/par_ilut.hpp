@@ -127,9 +127,9 @@ public:
     {
         /**
          * The number of total iterations of ParILUT that will be executed.
-         * The default value is 10.
+         * The default value is 5.
          */
-        size_type GKO_FACTORY_PARAMETER(iterations, 10);
+        size_type GKO_FACTORY_PARAMETER(iterations, 5);
 
         /**
          * @brief `true` means it is known that the matrix given to this
