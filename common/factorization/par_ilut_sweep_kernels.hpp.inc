@@ -41,6 +41,62 @@ __forceinline__ __device__ bool is_finite(ValueType v)
 
 
 template <int subwarp_size, typename IndexType, typename ValueType>
+__global__ __launch_bounds__(default_block_size) void sweep_sequential(
+    const IndexType *a_row_ptrs, const IndexType *a_col_idxs,
+    const ValueType *a_vals, const IndexType *l_row_ptrs,
+    const IndexType *l_row_idxs, const IndexType *l_col_idxs, ValueType *l_vals,
+    IndexType l_nnz, const IndexType *u_col_ptrs, const IndexType *u_row_idxs,
+    const IndexType *u_col_idxs, ValueType *u_vals, IndexType u_nnz)
+{
+    auto tidx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (tidx >= l_nnz + u_nnz) {
+        return;
+    }
+    auto l_nz = static_cast<IndexType>(tidx);
+    auto u_nz = l_nz - l_nnz;
+    auto lower = u_nz < 0;
+    auto row = lower ? l_row_idxs[l_nz] : u_row_idxs[u_nz];
+    auto col = lower ? l_col_idxs[l_nz] : u_col_idxs[u_nz];
+    if (lower && row == col) {
+        // don't update the diagonal twice
+        return;
+    }
+    auto a_row_begin = a_row_ptrs[row];
+    auto a_row_size = a_row_ptrs[row + 1] - a_row_begin;
+    auto a_idx = binary_search(a_row_begin, a_row_size, [&](IndexType i) {
+        return a_col_idxs[i] >= col;
+    });
+    auto a_val = a_col_idxs[a_idx] == col ? a_vals[a_idx] : zero<ValueType>();
+    auto l_row_begin = l_row_ptrs[row];
+    auto l_row_size = l_row_ptrs[row + 1] - l_row_begin;
+    auto u_col_begin = u_col_ptrs[col];
+    auto u_col_size = u_col_ptrs[col + 1] - u_col_begin;
+    ValueType sum{};
+    auto last_entry = min(row, col);
+    sequential_merge(l_col_idxs + l_row_begin, l_row_size,
+                     u_row_idxs + u_col_begin, u_col_size,
+                     [&](IndexType l_idx, IndexType l_col, IndexType u_idx,
+                         IndexType u_row, IndexType) {
+                         if (l_col == u_row && l_col < last_entry) {
+                             sum += l_vals[l_idx + l_row_begin] *
+                                    u_vals[u_idx + u_col_begin];
+                         }
+                     });
+    if (lower) {
+        auto to_write = (a_val - sum) / u_vals[u_col_ptrs[col + 1] - 1];
+        if (is_finite(to_write)) {
+            l_vals[l_nz] = to_write;
+        }
+    } else {
+        auto to_write = a_val - sum;
+        if (is_finite(to_write)) {
+            u_vals[u_nz] = to_write;
+        }
+    }
+}
+
+
+template <int subwarp_size, typename IndexType, typename ValueType>
 __global__ __launch_bounds__(default_block_size) void sweep(
     const IndexType *a_row_ptrs, const IndexType *a_col_idxs,
     const ValueType *a_vals, const IndexType *l_row_ptrs,
