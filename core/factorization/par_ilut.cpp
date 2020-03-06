@@ -286,14 +286,13 @@ void ParIlutState<ValueType, IndexType>::iterate()
         u_csc_builder.get_col_idx_array().resize_and_reset(u_nnz);
         u_csc_builder.get_value_array().resize_and_reset(u_nnz);
         // update arrays that will be aliased
-        l_builder.get_col_idx_array() =
-            Array<IndexType>::view(exec, l_nnz, l_new->get_col_idxs());
-        u_builder.get_col_idx_array() =
-            Array<IndexType>::view(exec, u_nnz, u_new_csc->get_col_idxs());
-        l_builder.get_value_array() =
-            Array<ValueType>::view(exec, l_nnz, l_new->get_values());
-        u_builder.get_value_array() =
-            Array<ValueType>::view(exec, u_nnz, u_new_csc->get_values());
+        l_builder.get_col_idx_array().make_view(exec, l_nnz,
+                                                l_new->get_col_idxs());
+        u_builder.get_col_idx_array().make_view(exec, u_nnz,
+                                                u_new_csc->get_col_idxs());
+        l_builder.get_value_array().make_view(exec, l_nnz, l_new->get_values());
+        u_builder.get_value_array().make_view(exec, u_nnz,
+                                              u_new_csc->get_values());
     }
 
     // convert u_new into csc format
@@ -307,26 +306,27 @@ void ParIlutState<ValueType, IndexType>::iterate()
     exec->run(make_compute_l_u_factors(system_matrix, l_new.get(), l_coo.get(),
                                        u_new_csc.get(), u_transp_coo.get()));
 
-    // make sure the selection ranks are within bounds
-    IndexType l_nnz_limit_cur =
-        std::min<size_type>(l_nnz_limit, l_new->get_num_stored_elements() - 1);
-    IndexType u_nnz_limit_cur =
-        std::min<size_type>(u_nnz_limit, u_new->get_num_stored_elements() - 1);
+    // determine ranks for selection/filtering
+    IndexType l_nnz = l_new->get_num_stored_elements();
+    IndexType u_nnz = u_new->get_num_stored_elements();
+    // make sure that the rank is in [0, *_nnz)
+    auto l_filter_rank = std::max<IndexType>(0, l_nnz - l_nnz_limit - 1);
+    auto u_filter_rank = std::max<IndexType>(0, u_nnz - u_nnz_limit - 1);
     if (use_approx_select) {
         // remove approximately smallest candidates
         exec->run(make_threshold_filter_approx(
-            l_new.get(), l_nnz_limit_cur, selection_tmp, l.get(), l_coo.get()));
-        exec->run(make_threshold_filter_approx(u_new_csc.get(), u_nnz_limit_cur,
+            l_new.get(), l_filter_rank, selection_tmp, l.get(), l_coo.get()));
+        exec->run(make_threshold_filter_approx(u_new_csc.get(), u_filter_rank,
                                                selection_tmp, u_csc.get(),
                                                u_transp_coo.get()));
     } else {
         // select threshold to remove smallest candidates
         remove_complex<ValueType> l_threshold{};
-        exec->run(make_threshold_select(l_new.get(), l_nnz_limit_cur,
+        exec->run(make_threshold_select(l_new.get(), l_filter_rank,
                                         selection_tmp, selection_tmp2,
                                         l_threshold));
         remove_complex<ValueType> u_threshold{};
-        exec->run(make_threshold_select(u_new_csc.get(), u_nnz_limit_cur,
+        exec->run(make_threshold_select(u_new_csc.get(), u_filter_rank,
                                         selection_tmp, selection_tmp2,
                                         u_threshold));
 

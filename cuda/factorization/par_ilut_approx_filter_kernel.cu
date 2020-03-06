@@ -123,15 +123,8 @@ void threshold_filter_approx(syn::value_list<int, subwarp_size>,
     ssss_count(values, size, tree, oracles, partial_counts, total_counts);
 
     // determine bucket with correct rank
-    auto total_counts_array =
-        Array<IndexType>::view(exec, bucket_count + 1, total_counts);
-    Array<IndexType> splitter_ranks_array(exec->get_master(),
-                                          total_counts_array);
-    auto splitter_ranks = splitter_ranks_array.get_const_data();
-    auto it = std::upper_bound(splitter_ranks,
-                               splitter_ranks + bucket_count + 1, rank);
-    auto bucket =
-        static_cast<unsigned char>(std::distance(splitter_ranks + 1, it));
+    auto bucket = static_cast<unsigned char>(
+        ssss_find_bucket(exec, total_counts, rank).idx);
 
     // filter the elements
     auto old_row_ptrs = m->get_const_row_ptrs();
@@ -160,10 +153,8 @@ void threshold_filter_approx(syn::value_list<int, subwarp_size>,
     auto new_vals = m_out->get_values();
     matrix::CooBuilder<ValueType, IndexType> coo_builder{m_out_coo};
     coo_builder.get_row_idx_array().resize_and_reset(new_nnz);
-    coo_builder.get_col_idx_array() =
-        Array<IndexType>::view(exec, new_nnz, new_col_idxs);
-    coo_builder.get_value_array() =
-        Array<ValueType>::view(exec, new_nnz, new_vals);
+    coo_builder.get_col_idx_array().make_view(exec, new_nnz, new_col_idxs);
+    coo_builder.get_value_array().make_view(exec, new_nnz, new_vals);
     auto new_row_idxs = m_out_coo->get_row_idxs();
     kernel::bucket_filter<subwarp_size><<<num_blocks, default_block_size>>>(
         old_row_ptrs, old_col_idxs, as_cuda_type(old_vals), oracles, num_rows,

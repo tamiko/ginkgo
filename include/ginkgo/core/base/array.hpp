@@ -414,6 +414,24 @@ public:
     }
 
     /**
+     * Replaces the Array by an `Array::view` on the given executor.
+     *
+     * The res afterwards is equivalent to an Array constructed
+     * with `Array::view` and the same
+     *
+     * @param exec  the Executor where the data resides
+     * @param num_elems  the number of elements in the array view
+     * @param data   the data pointer for the array view
+     */
+    void make_view(std::shared_ptr<const Executor> exec, size_type num_elems,
+                   value_type *data)
+    {
+        this->data_ = data_manager{data, view_deleter{}};
+        this->num_elems_ = num_elems;
+        this->exec_ = exec;
+    }
+
+    /**
      * Returns the number of elements in the Array.
      *
      * @return the number of elements in the Array
