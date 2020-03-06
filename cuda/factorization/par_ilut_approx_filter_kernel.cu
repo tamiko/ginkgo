@@ -71,10 +71,6 @@ namespace cuda {
 namespace par_ilut_factorization {
 
 
-constexpr auto default_block_size = 512;
-constexpr auto items_per_thread = 2;
-
-
 // subwarp sizes for filter kernels
 using compiled_kernels =
     syn::value_list<int, 1, 2, 4, 8, 16, 32, config::warp_size>;

@@ -70,6 +70,7 @@ target_sources(ginkgo_cuda
         factorization/par_ilut_approx_filter_kernel.cu
         factorization/par_ilut_filter_kernel.cu
         factorization/par_ilut_select_kernel.cu
+        factorization/par_ilut_select_common.cu
         factorization/par_ilut_spgeam_kernel.cu
         factorization/par_ilut_sweep_kernel.cu
         matrix/coo_kernels.cu

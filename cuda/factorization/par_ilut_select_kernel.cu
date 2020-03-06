@@ -42,7 +42,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include "core/components/prefix_sum.hpp"
-#include "core/synthesizer/implementation_selection.hpp"
 #include "cuda/base/math.hpp"
 #include "cuda/components/atomic.cuh"
 #include "cuda/components/intrinsics.cuh"
@@ -63,36 +62,7 @@ namespace cuda {
 namespace par_ilut_factorization {
 
 
-constexpr auto default_block_size = 512;
-constexpr auto items_per_thread = 2;
-
-
 #include "common/factorization/par_ilut_select_kernels.hpp.inc"
-
-
-template <typename ValueType, typename IndexType>
-void ssss_count(const ValueType *values, IndexType size,
-                remove_complex<ValueType> *tree, unsigned char *oracles,
-                IndexType *partial_counts, IndexType *total_counts)
-{
-    constexpr auto bucket_count = kernel::searchtree_width;
-    auto num_threads_total = ceildiv(size, items_per_thread);
-    auto num_blocks =
-        static_cast<IndexType>(ceildiv(num_threads_total, default_block_size));
-    // pick sample, build searchtree
-    kernel::build_searchtree<<<1, bucket_count>>>(as_cuda_type(values), size,
-                                                  tree);
-    // determine bucket sizes
-    kernel::count_buckets<<<num_blocks, default_block_size>>>(
-        as_cuda_type(values), size, tree, partial_counts, oracles,
-        items_per_thread);
-    // compute prefix sum and total sum over block-local values
-    kernel::block_prefix_sum<<<bucket_count, default_block_size>>>(
-        partial_counts, total_counts, num_blocks);
-    // compute prefix sum over bucket counts
-    start_prefix_sum<bucket_count><<<1, bucket_count>>>(
-        bucket_count, total_counts, total_counts + bucket_count);
-}
 
 
 template <typename ValueType, typename IndexType>
@@ -106,18 +76,6 @@ void ssss_filter(const ValueType *values, IndexType size,
     kernel::filter_bucket<<<num_blocks, default_block_size>>>(
         as_cuda_type(values), size, bucket, oracles, partial_counts, out,
         items_per_thread);
-}
-
-
-template <typename IndexType>
-ssss_bucket<IndexType> ssss_find_bucket(
-    std::shared_ptr<const DefaultExecutor> exec, IndexType *prefix_sum,
-    IndexType rank)
-{
-    kernel::find_bucket<<<1, config::warp_size>>>(prefix_sum, rank);
-    IndexType values[3]{};
-    exec->get_master()->copy_from(exec.get(), 3, prefix_sum, values);
-    return {values[0], values[1], values[2]};
 }
 
 

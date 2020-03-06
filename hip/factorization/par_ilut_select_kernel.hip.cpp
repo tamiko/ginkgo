@@ -45,7 +45,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include "core/components/prefix_sum.hpp"
-#include "core/synthesizer/implementation_selection.hpp"
 #include "hip/base/math.hip.hpp"
 #include "hip/components/atomic.hip.hpp"
 #include "hip/components/intrinsics.hip.hpp"
@@ -66,39 +65,7 @@ namespace hip {
 namespace par_ilut_factorization {
 
 
-constexpr auto default_block_size = 512;
-constexpr auto items_per_thread = 2;
-
-
 #include "common/factorization/par_ilut_select_kernels.hpp.inc"
-
-
-template <typename ValueType, typename IndexType>
-void ssss_count(const ValueType *values, IndexType size,
-                remove_complex<ValueType> *tree, unsigned char *oracles,
-                IndexType *partial_counts, IndexType *total_counts)
-{
-    constexpr auto bucket_count = kernel::searchtree_width;
-    auto num_threads_total = ceildiv(size, items_per_thread);
-    auto num_blocks =
-        static_cast<IndexType>(ceildiv(num_threads_total, default_block_size));
-    // pick sample, build searchtree
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel::build_searchtree), dim3(1),
-                       dim3(bucket_count), 0, 0, as_hip_type(values), size,
-                       tree);
-    // determine bucket sizes
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel::count_buckets), dim3(num_blocks),
-                       dim3(default_block_size), 0, 0, as_hip_type(values),
-                       size, tree, partial_counts, oracles, items_per_thread);
-    // compute prefix sum and total sum over block-local values
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel::block_prefix_sum),
-                       dim3(bucket_count), dim3(default_block_size), 0, 0,
-                       partial_counts, total_counts, num_blocks);
-    // compute prefix sum over bucket counts
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(start_prefix_sum<bucket_count>), dim3(1),
-                       dim3(bucket_count), 0, 0, bucket_count, total_counts,
-                       total_counts + bucket_count);
-}
 
 
 template <typename ValueType, typename IndexType>
@@ -113,19 +80,6 @@ void ssss_filter(const ValueType *values, IndexType size,
                        dim3(default_block_size), 0, 0, as_hip_type(values),
                        size, bucket, oracles, partial_counts, out,
                        items_per_thread);
-}
-
-
-template <typename IndexType>
-ssss_bucket<IndexType> ssss_find_bucket(
-    std::shared_ptr<const DefaultExecutor> exec, IndexType *prefix_sum,
-    IndexType rank)
-{
-    hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel::find_bucket), dim3(1),
-                       dim3(config::warp_size), 0, 0, prefix_sum, rank);
-    IndexType values[3]{};
-    exec->get_master()->copy_from(exec.get(), 3, prefix_sum, values);
-    return {values[0], values[1], values[2]};
 }
 
 

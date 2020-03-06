@@ -30,13 +30,21 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
+#ifndef GKO_HIP_FACTORIZATION_PAR_ILUT_SELECT_COMMON_HIP_HPP_
+#define GKO_HIP_FACTORIZATION_PAR_ILUT_SELECT_COMMON_HIP_HPP_
+
 #include <ginkgo/core/base/executor.hpp>
+#include <ginkgo/core/base/math.hpp>
 #include <ginkgo/core/base/types.hpp>
 
 namespace gko {
 namespace kernels {
 namespace hip {
 namespace par_ilut_factorization {
+
+
+constexpr auto default_block_size = 512;
+constexpr auto items_per_thread = 16;
 
 
 template <typename ValueType, typename IndexType>
@@ -63,3 +71,5 @@ ssss_bucket<IndexType> ssss_find_bucket(
 }  // namespace hip
 }  // namespace kernels
 }  // namespace gko
+
+#endif  // GKO_HIP_FACTORIZATION_PAR_ILUT_SELECT_COMMON_HIP_HPP_
