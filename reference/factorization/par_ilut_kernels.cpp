@@ -314,8 +314,6 @@ void abstract_spgeam(const matrix::Csr<ValueType, IndexType> *a,
     auto b_vals = b->get_const_values();
     constexpr auto sentinel = std::numeric_limits<IndexType>::max();
     for (size_type row = 0; row < num_rows; ++row) {
-        IndexType l_row_nnz{};
-        IndexType u_row_nnz{};
         auto a_begin = a_row_ptrs[row];
         auto a_end = a_row_ptrs[row + 1];
         auto b_begin = b_row_ptrs[row];

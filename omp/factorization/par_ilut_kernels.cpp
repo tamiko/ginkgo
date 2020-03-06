@@ -337,8 +337,6 @@ void abstract_spgeam(const matrix::Csr<ValueType, IndexType> *a,
     constexpr auto sentinel = std::numeric_limits<IndexType>::max();
 #pragma omp parallel for
     for (size_type row = 0; row < num_rows; ++row) {
-        IndexType l_row_nnz{};
-        IndexType u_row_nnz{};
         auto a_begin = a_row_ptrs[row];
         auto a_end = a_row_ptrs[row + 1];
         auto b_begin = b_row_ptrs[row];
@@ -392,17 +390,17 @@ void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
     auto u_new_row_ptrs = u_new->get_row_ptrs();
     constexpr auto sentinel = std::numeric_limits<IndexType>::max();
     // count nnz
-    abstract_spgeam(
-        a, lu, [](IndexType) -> std::pair<IndexType, IndexType> { return {}; },
-        [](IndexType row, IndexType col, ValueType, ValueType,
-           std::pair<IndexType, IndexType> &nnzs) {
-            nnzs.first += col <= row;
-            nnzs.second += col >= row;
-        },
-        [&](IndexType row, std::pair<IndexType, IndexType> nnzs) {
-            l_new_row_ptrs[row] = nnzs.first;
-            u_new_row_ptrs[row] = nnzs.second;
-        });
+    abstract_spgeam(a, lu,
+                    [](IndexType) { return std::pair<IndexType, IndexType>{}; },
+                    [](IndexType row, IndexType col, ValueType, ValueType,
+                       std::pair<IndexType, IndexType> &nnzs) {
+                        nnzs.first += col <= row;
+                        nnzs.second += col >= row;
+                    },
+                    [&](IndexType row, std::pair<IndexType, IndexType> nnzs) {
+                        l_new_row_ptrs[row] = nnzs.first;
+                        u_new_row_ptrs[row] = nnzs.second;
+                    });
 
     prefix_sum(exec, l_new_row_ptrs, num_rows + 1);
     prefix_sum(exec, u_new_row_ptrs, num_rows + 1);
