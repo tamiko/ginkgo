@@ -45,8 +45,6 @@ version version_info::get_mpi_version() noexcept
     return {1, 0, 0, "not compiled"};
 }
 
-void MpiExecutor::synchronize() const {}
-
 void MpiExecutor::mpi_init() {}
 
 int MpiExecutor::get_num_ranks() { return 0; }
