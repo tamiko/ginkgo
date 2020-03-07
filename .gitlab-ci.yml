@@ -21,6 +21,7 @@ stages:
   BUILD_OMP: "OFF"
   WITH_METIS: "OFF"
   BUILD_CUDA: "OFF"
+  BUILD_MPI: "OFF"
   BUILD_HIP: "OFF"
   CXX_FLAGS: ""
   EXTRA_CMAKE_FLAGS: ""
@@ -54,7 +55,7 @@ stages:
         -DGINKGO_DEVEL_TOOLS=OFF -DGINKGO_WITH_METIS=${WITH_METIS}
         -DGINKGO_BUILD_REFERENCE=${BUILD_REFERENCE}
         -DGINKGO_BUILD_OMP=${BUILD_OMP} -DGINKGO_BUILD_CUDA=${BUILD_CUDA}
-        -DGINKGO_BUILD_HIP=${BUILD_HIP}
+        -DGINKGO_BUILD_HIP=${BUILD_HIP} -DGINKGO_BUILD_MPI=${BUILD_MPI}
         -DGINKGO_BUILD_TESTS=ON -DGINKGO_BUILD_EXAMPLES=ON
     - make -j${NUM_CORES} 2>&1 | grep -v -e "loop not unrolled"
   dependencies: []
@@ -73,7 +74,7 @@ stages:
         -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} ${EXTRA_CMAKE_FLAGS}
         -DGINKGO_DEVEL_TOOLS=OFF -DGINKGO_BUILD_REFERENCE=${BUILD_REFERENCE}
         -DGINKGO_BUILD_OMP=${BUILD_OMP} -DGINKGO_BUILD_CUDA=${BUILD_CUDA}
-        -DGINKGO_BUILD_HIP=${BUILD_HIP}
+        -DGINKGO_BUILD_HIP=${BUILD_HIP} -DGINKGO_BUILD_MPI=${BUILD_MPI}
         -DGINKGO_BUILD_TESTS=ON -DGINKGO_BUILD_EXAMPLES=ON
     - make -j${NUM_CORES} install 2>&1 | grep -v -e "loop not unrolled"
     - |
@@ -245,6 +246,21 @@ build/cuda92/intel/cuda/release/static:
     - gpu
 
 # cuda 10.0 and friends
+build/cuda100/gcc/mpi/debug/shared:
+  <<: *default_build_with_test
+  image: localhost:5000/gko-cuda100-gnu7-llvm60
+  variables:
+    <<: *default_variables
+    BUILD_OMP: "ON"
+    BUILD_CUDA: "ON"
+    BUILD_HIP: "ON"
+    BUILD_MPI: "ON"
+    BUILD_TYPE: Debug
+    EXTRA_CMAKE_FLAGS: *cuda_flags
+  tags:
+    - cuda
+    - gpu
+
 build/cuda100/gcc/all/debug/shared:
   <<: *default_build_with_test
   image: localhost:5000/gko-cuda100-gnu7-llvm60

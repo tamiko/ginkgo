@@ -3,6 +3,7 @@ Ginkgo Base image
 Contents:
     CUDA version set by the user
     GNU compilers version set by the user
+    MPI version OpenMPI
     LLVM/Clang clang-tidy version set by the user
     Intel ICC and ICPC version set according to the CUDA version
     OpenMP latest apt version for Clang+OpenMP
@@ -80,6 +81,11 @@ clangtidy = ['clang-tidy-{}'.format(llvm_version)]
 Stage0 += packages(apt_ppas=['ppa:xorg-edgers/ppa'], apt=clangtidy)
 clangtidyln = ['ln -s /usr/bin/clang-tidy-{} /usr/bin/clang-tidy'.format(llvm_version)]
 Stage0 += shell(commands=clangtidyln)
+
+# mpi
+ompi_version = USERARG.get('ompi', '3.0.0')
+ompi = openmpi(infiniband=False, version=ompi_version)
+Stage0 += ompi
 
 # IWYU
 if os.path.isdir('bin/'):
