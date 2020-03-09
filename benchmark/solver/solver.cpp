@@ -59,7 +59,7 @@ DEFINE_double(rel_res_goal, 1e-6, "The relative residual goal of the solver");
 
 DEFINE_string(solvers, "cg",
               "A comma-separated list of solvers to run."
-              "Supported values are: bicgstab, cg, cgs, fcg, gmres");
+              "Supported values are: bicgstab, bicg, cg, cgs, fcg, gmres");
 
 DEFINE_string(preconditioners, "none",
               "A comma-separated list of preconditioners to use."
