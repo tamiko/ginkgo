@@ -38,6 +38,6 @@ jobs:
         cd build
         cmake -DCMAKE_PREFIX_PATH=/usr/local/cuda-10.2 -DGINKGO_BUILD_BENCHMARKS=off -DGINKGO_BUILD_EXAMPLES=off -DGINKGO_BUILD_CUDA=on -DGINKGO_BUILD_MPI=on ..
         make -j10
-        ctest -j10
+        ctest -j10 -E "cuda"
         make install
         make test_install

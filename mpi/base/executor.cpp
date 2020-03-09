@@ -56,8 +56,6 @@ void MpiExecutor::mpi_init()
         GKO_ASSERT_NO_MPI_ERRORS(MPI_Init_thread(
             &(this->num_args_), &(this->args_), this->required_thread_support_,
             &(this->provided_thread_support_)));
-        // } else {
-        //     GKO_MPI_INITIALIZED;
     }
 }
 
@@ -65,12 +63,15 @@ void MpiExecutor::mpi_init()
 // void MpiExecutor::synchronize_communicator(
 //     gko::MpiExecutor::handle_manager<MpiContext> comm) const
 // {
-//     kernels::mpi::synchronize(comm);
-//     // GKO_ASSERT_NO_MPI_ERRORS(MPI_Barrier(comm));
+//     // kernels::mpi::synchronize(comm);
+//     GKO_ASSERT_NO_MPI_ERRORS(MPI_Barrier(comm));
 // }
 
 
-void MpiExecutor::synchronize() const { MPI_Barrier(MPI_COMM_WORLD); }
+void MpiExecutor::synchronize() const
+{
+    GKO_ASSERT_NO_MPI_ERRORS(MPI_Barrier(MPI_COMM_WORLD));
+}
 
 
 int MpiExecutor::get_my_rank()

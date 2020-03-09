@@ -99,4 +99,4 @@ TEST_F(MpiExecutor, CanDetectInitialized)
 
 // Calls a custom gtest main with MPI listeners. See gtest-mpi-listeners.hpp for
 // more details.
-GTEST_MPI_MAIN;
+GKO_DECLARE_GTEST_MPI_MAIN;

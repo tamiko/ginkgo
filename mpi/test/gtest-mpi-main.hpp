@@ -30,7 +30,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************<GINKGO LICENSE>*******************************/
 
-#define GTEST_MPI_MAIN                                                       \
+#define GKO_DECLARE_GTEST_MPI_MAIN                                           \
     int main(int argc, char **argv)                                          \
     {                                                                        \
         ::testing::InitGoogleTest(&argc, argv);                              \

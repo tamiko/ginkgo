@@ -4,19 +4,19 @@ project(Ginkgo LANGUAGES C CXX VERSION 1.1.1 DESCRIPTION "A numerical linear alg
 set(Ginkgo_VERSION_TAG "develop")
 set(PROJECT_VERSION_TAG ${Ginkgo_VERSION_TAG})
 
-# Determine which executors can be compiled
-include(cmake/hip_path.cmake)
-include(cmake/autodetect_executors.cmake)
-include(cmake/build_type_helpers.cmake)
-
 # Ginkgo configuration options
 option(GINKGO_DISABLE_AUTODETECT "Disable the auto-detection of executor modules" OFF)
 if(GINKGO_DISABLE_AUTODETECT)
-  message(STATUS "Auto-detection of executor modules has been disabled. Please enable the executor modules you need, manually")
+  message(STATUS "Auto-detection of executor modules has been disabled. Please enable the executor modules you need, manually.")
   set(GINKGO_HAS_OMP OFF)
   set(GINKGO_HAS_MPI OFF)
   set(GINKGO_HAS_CUDA OFF)
   set(GINKGO_HAS_HIP OFF)
+else()
+  # Determine which executors can be compiled
+  include(cmake/hip_path.cmake)
+  include(cmake/autodetect_executors.cmake)
+  include(cmake/build_type_helpers.cmake)
 endif()
 
 option(GINKGO_DEVEL_TOOLS "Add development tools to the build system" OFF)
@@ -216,10 +216,6 @@ if (GINKGO_BUILD_REFERENCE)
     add_subdirectory(reference)  # Reference kernel implementations
 endif()
 
-if (GINKGO_BUILD_MPI)
-    add_subdirectory(mpi)        # High-performance mpi kernels
-endif()
-
 if (GINKGO_BUILD_OMP)
     add_subdirectory(omp)        # High-performance omp kernels
 endif()
@@ -227,6 +223,10 @@ endif()
 # which needs to know the `ginkgo` target.
 if(GINKGO_BUILD_HIP)
     add_subdirectory(hip)        # High-performance kernels for AMD or NVIDIA GPUs
+endif()
+
+if (GINKGO_BUILD_MPI)
+  add_subdirectory(mpi)        # High-performance mpi kernels
 endif()
 
 # Non core directories and targets

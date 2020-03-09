@@ -19,7 +19,7 @@ if(MPI_FOUND)
   if(NOT DEFINED GINKGO_BUILD_MPI)
     message(STATUS "Enabling MPI executor")
   endif()
-  set(GINKGO_HAS_MPI MPI)
+  set(GINKGO_HAS_MPI ON)
 endif()
 
 if(CMAKE_CUDA_COMPILER)

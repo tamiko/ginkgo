@@ -37,8 +37,8 @@ target_link_libraries(ginkgo_mpi PRIVATE "${MPI_C_LIBRARIES}")
 target_link_libraries(ginkgo_mpi PRIVATE "${MPI_CXX_LIBRARIES}")
 target_compile_options(ginkgo_mpi PRIVATE "${GINKGO_COMPILER_FLAGS}")
 
-# Need to link against ginkgo_cuda for the `raw_copy_to(CudaExecutor ...)` method
-target_link_libraries(ginkgo_mpi PUBLIC ginkgo_cuda)
+# Need to link to allow mpi kernels to call other kernels.
+target_link_libraries(ginkgo_mpi PUBLIC ginkgo_cuda ginkgo_omp ginkgo_reference ginkgo_hip)
 
 ginkgo_default_includes(ginkgo_mpi)
 ginkgo_install_library(ginkgo_mpi mpi)
