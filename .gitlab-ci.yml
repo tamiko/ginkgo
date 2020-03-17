@@ -246,21 +246,6 @@ build/cuda92/intel/cuda/release/static:
     - gpu
 
 # cuda 10.0 and friends
-build/cuda100/gcc/mpi/debug/shared:
-  <<: *default_build_with_test
-  image: localhost:5000/gko-cuda100-gnu7-llvm60
-  variables:
-    <<: *default_variables
-    BUILD_OMP: "ON"
-    BUILD_CUDA: "ON"
-    BUILD_HIP: "ON"
-    BUILD_MPI: "ON"
-    BUILD_TYPE: Debug
-    EXTRA_CMAKE_FLAGS: *cuda_flags
-  tags:
-    - cuda
-    - gpu
-
 build/cuda100/gcc/all/debug/shared:
   <<: *default_build_with_test
   image: localhost:5000/gko-cuda100-gnu7-llvm60
@@ -437,17 +422,19 @@ build/nocuda/gcc/metis/release/shared:
     WITH_METIS: "ON"
     BUILD_TYPE: Release
   tags:
+    - private_ci
     - cpu
 
-build/nocuda/gcc/metis/release/shared:
+build/nocuda/gcc/mpi/release/shared:
   <<: *default_build
   image: localhost:5000/gko-nocuda-gnu8-llvm70
   variables:
     <<: *default_variables
     BUILD_OMP: "ON"
-    WITH_METIS: "ON"
+    BUILD_MPI: "ON"
     BUILD_TYPE: Release
   tags:
+    - private_ci
     - cpu
 
 build/nocuda/gcc/omp/release/shared:

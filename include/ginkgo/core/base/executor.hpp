@@ -731,14 +731,14 @@ public:
 
     using mpi_exec_info = machine_config::topology<MpiExecutor>;
 
-    using DefaultMemorySpace = HostMemorySpace;
+    using DefaultMemorySpace = DistributedMemorySpace;
 
     /**
      * Creates a new MpiExecutor.
      */
-    static std::shared_ptr<MpiExecutor> create(int &num_args, char **&args,
-                                               int required_thread_support,
-                                               bool enable_gpu);
+    static std::shared_ptr<MpiExecutor> create(
+        std::initializer_list<std::string> sub_exec_list, int num_args = 0,
+        char **args = nullptr);
 
     static std::shared_ptr<MpiExecutor> create();
 
@@ -773,28 +773,43 @@ public:
      */
     mpi_exec_info *get_exec_info() const { return exec_info_.get(); }
 
+    std::vector<std::shared_ptr<gko::Executor>> get_sub_executors() const
+    {
+        return sub_executors_;
+    }
+
+    std::vector<std::string> get_sub_executor_list() const
+    {
+        return sub_exec_list_;
+    }
+
 protected:
     MpiExecutor() = delete;
 
     void mpi_init();
 
+    void create_sub_executors(
+        std::vector<std::string> &sub_exec_list,
+        std::vector<std::shared_ptr<gko::Executor>> &sub_executors);
+
     bool is_finalized();
+
+    // int get_num_gpus();
 
     bool is_initialized();
 
     void destroy();
 
-    MpiExecutor(int &num_args, char **&args, int required_thread_support,
-                bool enable_gpu)
+    MpiExecutor(std::initializer_list<std::string> sub_exec_list, int num_args,
+                char **args)
         : num_ranks_(1),
           num_args_(num_args),
           args_(args),
-          enable_gpu_(enable_gpu),
-          required_thread_support_(required_thread_support),
-          provided_thread_support_(0)
+          sub_exec_list_(sub_exec_list)
     {
         this->mpi_init();
         num_ranks_ = this->get_num_ranks();
+        this->create_sub_executors(sub_exec_list_, sub_executors_);
     }
 
     bool check_mem_space_validity(std::shared_ptr<MemorySpace> mem_space)
@@ -808,15 +823,14 @@ protected:
         }
     }
 
-
 private:
     int num_ranks_;
     int num_args_;
-    bool enable_gpu_;
-    char **args_;
     int required_thread_support_;
     int provided_thread_support_;
-
+    char **args_;
+    std::vector<std::string> sub_exec_list_;
+    std::vector<std::shared_ptr<gko::Executor>> sub_executors_;
     handle_manager<MpiContext> mpi_comm_;
 
     std::unique_ptr<mpi_exec_info> exec_info_;

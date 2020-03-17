@@ -32,9 +32,8 @@ target_sources(ginkgo_mpi
 
 ginkgo_compile_features(ginkgo_mpi)
 target_include_directories(ginkgo_mpi
-    SYSTEM PRIVATE ${MPI_INCLUDE_PATH})
-target_link_libraries(ginkgo_mpi PRIVATE "${MPI_C_LIBRARIES}")
-target_link_libraries(ginkgo_mpi PRIVATE "${MPI_CXX_LIBRARIES}")
+  SYSTEM PRIVATE ${MPI_INCLUDE_PATH})
+target_link_libraries(ginkgo_mpi PRIVATE "${MPI_C_LIBRARIES}" "${MPI_CXX_LIBRARIES}")
 target_compile_options(ginkgo_mpi PRIVATE "${GINKGO_COMPILER_FLAGS}")
 
 # Need to link to allow mpi kernels to call other kernels.
@@ -42,6 +41,11 @@ target_link_libraries(ginkgo_mpi PUBLIC ginkgo_cuda ginkgo_omp ginkgo_reference 
 
 ginkgo_default_includes(ginkgo_mpi)
 ginkgo_install_library(ginkgo_mpi mpi)
+
+if (GINKGO_HAVE_HWLOC)
+  target_link_libraries(ginkgo_mpi PRIVATE ${HWLOC_hwloc_LIBRARY})
+  target_include_directories(ginkgo_mpi PRIVATE ${HWLOC_hwloc.h_DIRS})
+endif()
 
 if(GINKGO_BUILD_TESTS)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/test)

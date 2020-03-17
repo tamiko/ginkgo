@@ -34,6 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include <iostream>
+#include <map>
 
 
 #include <mpi.h>
@@ -59,6 +60,32 @@ void MpiExecutor::mpi_init()
     }
 }
 
+
+void MpiExecutor::create_sub_executors(
+    std::vector<std::string> &sub_exec_list,
+    std::vector<std::shared_ptr<gko::Executor>> &sub_executors)
+{
+    auto num_gpus = this->get_num_gpus();
+    int dev_id = 0;
+    for (auto i = 0; i < sub_exec_list.size(); ++i) {
+        if (sub_exec_list[i] == "omp") {
+            sub_executors.push_back(gko::OmpExecutor::create());
+        }
+        if (sub_exec_list[i] == "reference") {
+            sub_executors.push_back(gko::ReferenceExecutor::create());
+        }
+        if (sub_exec_list[i] == "cuda" && num_gpus > 0 && dev_id < num_gpus) {
+            sub_executors.push_back(
+                gko::CudaExecutor::create(dev_id, gko::OmpExecutor::create()));
+            dev_id++;
+        }
+        if (sub_exec_list[i] == "hip" && num_gpus > 0 && dev_id < num_gpus) {
+            sub_executors.push_back(
+                gko::HipExecutor::create(dev_id, gko::OmpExecutor::create()));
+            dev_id++;
+        }
+    }
+}
 
 // void MpiExecutor::synchronize_communicator(
 //     gko::MpiExecutor::handle_manager<MpiContext> comm) const
@@ -90,12 +117,11 @@ int MpiExecutor::get_num_ranks()
 }
 
 
-std::shared_ptr<MpiExecutor> MpiExecutor::create(int &num_args, char **&args,
-                                                 int required_thread_support,
-                                                 bool enable_gpu)
+std::shared_ptr<MpiExecutor> MpiExecutor::create(
+    std::initializer_list<std::string> sub_exec_list, int num_args, char **args)
 {
     return std::shared_ptr<MpiExecutor>(
-        new MpiExecutor(num_args, args, required_thread_support, enable_gpu),
+        new MpiExecutor(sub_exec_list, num_args, args),
         [](MpiExecutor *exec) { delete exec; });
 }
 
@@ -104,7 +130,7 @@ std::shared_ptr<MpiExecutor> MpiExecutor::create()
 {
     int num_args = 0;
     char **args;
-    return MpiExecutor::create(num_args, args, MPI_THREAD_SINGLE, false);
+    return MpiExecutor::create({"reference"}, num_args, args);
 }
 
 

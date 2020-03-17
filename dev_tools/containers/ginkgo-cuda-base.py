@@ -35,6 +35,8 @@ else:
 
 Stage0.baseimage(image)
 
+add_metis = USERARG.get('metis', 'False')
+add_mpi = USERARG.get('mpi', 'False')
 
 # Correctly set the LIBRARY_PATH
 Stage0 += environment(variables={'CUDA_INSTALL_PATH': '/usr/local/cuda/'})
@@ -60,6 +62,10 @@ Stage0 += apt_get(ospackages=['build-essential', 'automake', 'pkg-config', 'libt
 Stage0 += apt_get(ospackages=['libthrust-dev'])
 Stage0 += apt_get(ospackages=['gnupg-agent'])
 Stage0 += apt_get(ospackages=['ca-certificates']) # weird github certificates problem
+if add_metis == 'True':
+    Stage0 += apt_get(ospackages=['libmetis-dev'])
+if add_mpi == 'True':
+    Stage0 += apt_get(ospackages=['libopenmpi-dev'])
 
 # GNU compilers
 gnu_version = USERARG.get('gnu', '7')
@@ -81,11 +87,6 @@ clangtidy = ['clang-tidy-{}'.format(llvm_version)]
 Stage0 += packages(apt_ppas=['ppa:xorg-edgers/ppa'], apt=clangtidy)
 clangtidyln = ['ln -s /usr/bin/clang-tidy-{} /usr/bin/clang-tidy'.format(llvm_version)]
 Stage0 += shell(commands=clangtidyln)
-
-# mpi
-ompi_version = USERARG.get('ompi', '3.0.0')
-ompi = openmpi(infiniband=False, version=ompi_version)
-Stage0 += ompi
 
 # IWYU
 if os.path.isdir('bin/'):

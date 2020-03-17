@@ -47,14 +47,20 @@ version version_info::get_mpi_version() noexcept
 
 void MpiExecutor::mpi_init() {}
 
+void MpiExecutor::create_sub_executors(
+    std::vector<std::string> &sub_exec_list,
+    std::vector<std::shared_ptr<gko::Executor>> &sub_executors)
+{}
+
 int MpiExecutor::get_num_ranks() { return 0; }
 
-std::shared_ptr<MpiExecutor> MpiExecutor::create(int &num_args, char **&args,
-                                                 int required_thread_support,
-                                                 bool enable_gpu)
+// int MpiExecutor::get_num_gpus() { return 0; }
+
+std::shared_ptr<MpiExecutor> MpiExecutor::create(
+    std::initializer_list<std::string> sub_exec_list, int num_args, char **args)
 {
     return std::shared_ptr<MpiExecutor>(
-        new MpiExecutor(num_args, args, required_thread_support, enable_gpu));
+        new MpiExecutor(sub_exec_list, num_args, args));
 }
 
 // void MpiExecutor::run(const Operation &op) const
@@ -68,7 +74,7 @@ std::shared_ptr<MpiExecutor> MpiExecutor::create()
 {
     int num_args = 0;
     char **args;
-    return MpiExecutor::create(num_args, args, 0, false);
+    return MpiExecutor::create({}, num_args, args);
 }
 
 

@@ -57,8 +57,8 @@ protected:
     {
         char **argv;
         int argc = 0;
-        // mpi = gko::MpiExecutor::create();
-        mpi = gko::MpiExecutor::create(argc, argv, 1, true);
+        // mpi = gko::MpiExecutor::create(1, true, argc, argv);
+        mpi = gko::MpiExecutor::create({"omp"});
     }
 
     void TearDown()
@@ -77,6 +77,7 @@ TEST_F(MpiExecutor, KnowsItsSize)
 {
     int size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
     EXPECT_EQ(mpi->get_num_ranks(), size);
 }
 
@@ -85,17 +86,31 @@ TEST_F(MpiExecutor, KnowsItsRanks)
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     EXPECT_EQ(rank, mpi->get_my_rank());
 }
 
 
-TEST_F(MpiExecutor, CanDetectInitialized)
+TEST_F(MpiExecutor, KnowsItsSubExecutorList)
 {
-    auto mpi2 = gko::MpiExecutor::create();
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    EXPECT_EQ(rank, mpi->get_my_rank());
+    auto sub_exec_list = mpi->get_sub_executor_list();
+
+    EXPECT_EQ("omp", sub_exec_list[0]);
 }
+
+
+TEST_F(MpiExecutor, KnowsItsSubExecutors)
+{
+    auto sub_execs = mpi->get_sub_executors();
+    auto omp = gko::OmpExecutor::create();
+    auto ref = gko::ReferenceExecutor::create();
+
+    EXPECT_EQ(typeid(*(omp.get())).name(),
+              typeid(*(sub_execs[0].get())).name());
+    EXPECT_NE(typeid(*(ref.get())).name(),
+              typeid(*(sub_execs[0].get())).name());
+}
+
 
 // Calls a custom gtest main with MPI listeners. See gtest-mpi-listeners.hpp for
 // more details.
