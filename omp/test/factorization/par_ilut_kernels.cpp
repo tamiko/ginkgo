@@ -60,15 +60,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace {
 
 
+template <typename ValueIndexType>
 class ParIlut : public ::testing::Test {
 protected:
-    using value_type = gko::default_precision;
-    using index_type = gko::int32;
+    using value_type =
+        typename std::tuple_element<0, decltype(ValueIndexType())>::type;
+    using index_type =
+        typename std::tuple_element<1, decltype(ValueIndexType())>::type;
     using Dense = gko::matrix::Dense<value_type>;
-    using ComplexDense = gko::matrix::Dense<std::complex<value_type>>;
     using Coo = gko::matrix::Coo<value_type, index_type>;
     using Csr = gko::matrix::Csr<value_type, index_type>;
-    using ComplexCsr = gko::matrix::Csr<std::complex<value_type>, index_type>;
 
     ParIlut()
         : mtx_size(532, 423),
@@ -78,38 +79,40 @@ protected:
     {
         mtx1 = gko::test::generate_random_matrix<Csr>(
             mtx_size[0], mtx_size[1],
-            std::uniform_int_distribution<>(10, mtx_size[1]),
-            std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
+            std::uniform_int_distribution<index_type>(10, mtx_size[1]),
+            std::normal_distribution<gko::remove_complex<value_type>>(-1.0,
+                                                                      1.0),
+            rand_engine, ref);
         mtx2 = gko::test::generate_random_matrix<Csr>(
             mtx_size[0], mtx_size[1],
-            std::uniform_int_distribution<>(0, mtx_size[1]),
-            std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
+            std::uniform_int_distribution<index_type>(0, mtx_size[1]),
+            std::normal_distribution<gko::remove_complex<value_type>>(-1.0,
+                                                                      1.0),
+            rand_engine, ref);
         mtx_square = gko::test::generate_random_matrix<Csr>(
             mtx_size[0], mtx_size[0],
-            std::uniform_int_distribution<>(1, mtx_size[0]),
-            std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
+            std::uniform_int_distribution<index_type>(1, mtx_size[0]),
+            std::normal_distribution<gko::remove_complex<value_type>>(-1.0,
+                                                                      1.0),
+            rand_engine, ref);
         mtx_l = gko::test::generate_random_lower_triangular_matrix<Csr>(
             mtx_size[0], mtx_size[0], false,
-            std::uniform_int_distribution<>(10, mtx_size[0]),
-            std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
+            std::uniform_int_distribution<index_type>(10, mtx_size[0]),
+            std::normal_distribution<gko::remove_complex<value_type>>(-1.0,
+                                                                      1.0),
+            rand_engine, ref);
         mtx_l2 = gko::test::generate_random_lower_triangular_matrix<Csr>(
             mtx_size[0], mtx_size[0], true,
-            std::uniform_int_distribution<>(1, mtx_size[0]),
-            std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
-        mtx_l_complex =
-            gko::test::generate_random_lower_triangular_matrix<ComplexCsr>(
-                mtx_size[0], mtx_size[0], false,
-                std::uniform_int_distribution<>(10, mtx_size[0]),
-                std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
+            std::uniform_int_distribution<index_type>(1, mtx_size[0]),
+            std::normal_distribution<gko::remove_complex<value_type>>(-1.0,
+                                                                      1.0),
+            rand_engine, ref);
         mtx_u = gko::test::generate_random_upper_triangular_matrix<Csr>(
             mtx_size[0], mtx_size[0], false,
-            std::uniform_int_distribution<>(10, mtx_size[0]),
-            std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
-        mtx_u_complex =
-            gko::test::generate_random_upper_triangular_matrix<ComplexCsr>(
-                mtx_size[0], mtx_size[0], false,
-                std::uniform_int_distribution<>(10, mtx_size[0]),
-                std::normal_distribution<>(-1.0, 1.0), rand_engine, ref);
+            std::uniform_int_distribution<index_type>(10, mtx_size[0]),
+            std::normal_distribution<gko::remove_complex<value_type>>(-1.0,
+                                                                      1.0),
+            rand_engine, ref);
 
         dmtx1 = Csr::create(omp);
         dmtx1->copy_from(mtx1.get());
@@ -126,10 +129,6 @@ protected:
         dmtx_l2->copy_from(mtx_l2.get());
         dmtx_u = Csr::create(omp);
         dmtx_u->copy_from(mtx_u.get());
-        dmtx_l_complex = ComplexCsr::create(omp);
-        dmtx_l_complex->copy_from(mtx_l_complex.get());
-        dmtx_u_complex = ComplexCsr::create(omp);
-        dmtx_u_complex->copy_from(mtx_u_complex.get());
     }
 
     void SetUp()
@@ -174,20 +173,18 @@ protected:
         dmtx_ut_ani->copy_from(mtx_ut_ani.get());
     }
 
-    template <typename Mtx>
-    void test_select(const std::unique_ptr<Mtx> &mtx,
-                     const std::unique_ptr<Mtx> &dmtx, index_type rank,
-                     value_type tolerance = 0.0)
+    void test_select(const std::unique_ptr<Csr> &mtx,
+                     const std::unique_ptr<Csr> &dmtx, index_type rank,
+                     gko::remove_complex<value_type> tolerance = 0.0)
     {
         auto size = index_type(mtx->get_num_stored_elements());
-        using ValueType = typename Mtx::value_type;
 
-        gko::remove_complex<ValueType> res{};
-        gko::remove_complex<ValueType> dres{};
-        gko::Array<ValueType> tmp(ref);
-        gko::Array<gko::remove_complex<ValueType>> tmp2(ref);
-        gko::Array<ValueType> dtmp(omp);
-        gko::Array<gko::remove_complex<ValueType>> dtmp2(omp);
+        gko::remove_complex<value_type> res{};
+        gko::remove_complex<value_type> dres{};
+        gko::Array<value_type> tmp(ref);
+        gko::Array<gko::remove_complex<value_type>> tmp2(ref);
+        gko::Array<value_type> dtmp(omp);
+        gko::Array<gko::remove_complex<value_type>> dtmp2(omp);
 
         gko::kernels::reference::par_ilut_factorization::threshold_select(
             ref, mtx.get(), rank, tmp, tmp2, res);
@@ -197,14 +194,12 @@ protected:
         ASSERT_EQ(res, dres);
     }
 
-    template <typename Mtx,
-              typename Coo = gko::matrix::Coo<typename Mtx::value_type,
-                                              typename Mtx::index_type>>
-    void test_filter(const std::unique_ptr<Mtx> &mtx,
-                     const std::unique_ptr<Mtx> &dmtx, value_type threshold)
+    void test_filter(const std::unique_ptr<Csr> &mtx,
+                     const std::unique_ptr<Csr> &dmtx,
+                     gko::remove_complex<value_type> threshold)
     {
-        auto res = Mtx::create(ref, mtx_size);
-        auto dres = Mtx::create(omp, mtx_size);
+        auto res = Csr::create(ref, mtx_size);
+        auto dres = Csr::create(omp, mtx_size);
         auto res_coo = Coo::create(ref, mtx_size);
         auto dres_coo = Coo::create(omp, mtx_size);
 
@@ -221,20 +216,16 @@ protected:
         GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
     }
 
-    template <typename Mtx,
-              typename Coo = gko::matrix::Coo<typename Mtx::value_type,
-                                              typename Mtx::index_type>>
-    void test_filter_approx(const std::unique_ptr<Mtx> &mtx,
-                            const std::unique_ptr<Mtx> &dmtx, index_type rank)
+    void test_filter_approx(const std::unique_ptr<Csr> &mtx,
+                            const std::unique_ptr<Csr> &dmtx, index_type rank)
     {
-        auto res = Mtx::create(ref, mtx_size);
-        auto dres = Mtx::create(omp, mtx_size);
+        auto res = Csr::create(ref, mtx_size);
+        auto dres = Csr::create(omp, mtx_size);
         auto res_coo = Coo::create(ref, mtx_size);
         auto dres_coo = Coo::create(omp, mtx_size);
-        using ValueType = typename Mtx::value_type;
 
-        gko::Array<ValueType> tmp(ref);
-        gko::Array<ValueType> dtmp(omp);
+        gko::Array<value_type> tmp(ref);
+        gko::Array<value_type> dtmp(omp);
 
         gko::kernels::reference::par_ilut_factorization::
             threshold_filter_approx(ref, mtx.get(), rank, tmp, res.get(),
@@ -264,9 +255,7 @@ protected:
     std::unique_ptr<Csr> mtx_ut_ani;
     std::unique_ptr<Csr> mtx_l;
     std::unique_ptr<Csr> mtx_l2;
-    std::unique_ptr<ComplexCsr> mtx_l_complex;
     std::unique_ptr<Csr> mtx_u;
-    std::unique_ptr<ComplexCsr> mtx_u_complex;
 
     std::unique_ptr<Csr> dmtx1;
     std::unique_ptr<Csr> dmtx2;
@@ -276,173 +265,123 @@ protected:
     std::unique_ptr<Csr> dmtx_ut_ani;
     std::unique_ptr<Csr> dmtx_l;
     std::unique_ptr<Csr> dmtx_l2;
-    std::unique_ptr<ComplexCsr> dmtx_l_complex;
     std::unique_ptr<Csr> dmtx_u;
-    std::unique_ptr<ComplexCsr> dmtx_u_complex;
 };
 
+TYPED_TEST_CASE(ParIlut, gko::test::ValueIndexTypes);
 
-TEST_F(ParIlut, KernelThresholdSelectIsEquivalentToRef)
+
+TYPED_TEST(ParIlut, KernelThresholdSelectIsEquivalentToRef)
 {
-    test_select(mtx_l, dmtx_l, mtx_l->get_num_stored_elements() / 3);
+    this->test_select(this->mtx_l, this->dmtx_l,
+                      this->mtx_l->get_num_stored_elements() / 3);
 }
 
 
-TEST_F(ParIlut, KernelThresholdSelectMinIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdSelectMinIsEquivalentToRef)
 {
-    test_select(mtx_l, dmtx_l, 0);
+    this->test_select(this->mtx_l, this->dmtx_l, 0);
 }
 
 
-TEST_F(ParIlut, KernelThresholdSelectMaxIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdSelectMaxIsEquivalentToRef)
 {
-    test_select(mtx_l, dmtx_l, mtx_l->get_num_stored_elements() - 1);
+    this->test_select(this->mtx_l, this->dmtx_l,
+                      this->mtx_l->get_num_stored_elements() - 1);
 }
 
 
-TEST_F(ParIlut, KernelComplexThresholdSelectIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdFilterLowerIsEquivalentToRef)
 {
-    test_select(mtx_l_complex, dmtx_l_complex,
-                mtx_l_complex->get_num_stored_elements() / 3);
+    this->test_filter(this->mtx_l, this->dmtx_l, 0.5);
 }
 
 
-TEST_F(ParIlut, KernelComplexThresholdSelectMinIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdFilterNoneLowerIsEquivalentToRef)
 {
-    test_select(mtx_l_complex, dmtx_l_complex, 0);
+    this->test_filter(this->mtx_l, this->dmtx_l, 0);
 }
 
 
-TEST_F(ParIlut, KernelComplexThresholdSelectMaxLowerIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdFilterAllLowerIsEquivalentToRef)
 {
-    test_select(mtx_l_complex, dmtx_l_complex,
-                mtx_l_complex->get_num_stored_elements() - 1);
+    this->test_filter(this->mtx_l, this->dmtx_l, 1e6);
 }
 
 
-TEST_F(ParIlut, KernelThresholdFilterLowerIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdFilterApproxLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l, dmtx_l, 0.5);
+    this->test_filter_approx(this->mtx_l, this->dmtx_l,
+                             this->mtx_l->get_num_stored_elements() / 2);
 }
 
 
-TEST_F(ParIlut, KernelThresholdFilterNoneLowerIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdFilterApproxNoneLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l, dmtx_l, 0);
+    this->test_filter_approx(this->mtx_l, this->dmtx_l, 0);
 }
 
 
-TEST_F(ParIlut, KernelThresholdFilterAllLowerIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelThresholdFilterApproxAllLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l, dmtx_l, 1e6);
+    this->test_filter_approx(this->mtx_l, this->dmtx_l,
+                             this->mtx_l->get_num_stored_elements() - 1);
 }
 
 
-TEST_F(ParIlut, KernelComplexThresholdFilterLowerIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelAddCandidatesIsEquivalentToRef)
 {
-    test_filter(mtx_l_complex, dmtx_l_complex, 0.5);
-}
-
-
-TEST_F(ParIlut, KernelComplexThresholdFilterNoneLowerIsEquivalentToRef)
-{
-    test_filter(mtx_l_complex, dmtx_l_complex, 0);
-}
-
-
-TEST_F(ParIlut, KernelComplexThresholdFilterAllLowerIsEquivalentToRef)
-{
-    test_filter(mtx_l_complex, dmtx_l_complex, 1e6);
-}
-
-
-TEST_F(ParIlut, KernelThresholdFilterApproxLowerIsEquivalentToRef)
-{
-    test_filter_approx(mtx_l, dmtx_l, mtx_l->get_num_stored_elements() / 2);
-}
-
-
-TEST_F(ParIlut, KernelThresholdFilterApproxNoneLowerIsEquivalentToRef)
-{
-    test_filter_approx(mtx_l, dmtx_l, 0);
-}
-
-
-TEST_F(ParIlut, KernelThresholdFilterApproxAllLowerIsEquivalentToRef)
-{
-    test_filter_approx(mtx_l, dmtx_l, mtx_l->get_num_stored_elements() - 1);
-}
-
-
-TEST_F(ParIlut, KernelComplexThresholdFilterApproxLowerIsEquivalentToRef)
-{
-    test_filter_approx(mtx_l_complex, dmtx_l_complex,
-                       mtx_l_complex->get_num_stored_elements() / 2);
-}
-
-
-TEST_F(ParIlut, KernelComplexThresholdFilterApproxNoneLowerIsEquivalentToRef)
-{
-    test_filter_approx(mtx_l_complex, dmtx_l_complex, 0);
-}
-
-
-TEST_F(ParIlut, KernelComplexThresholdFilterApproxAllLowerIsEquivalentToRef)
-{
-    test_filter_approx(mtx_l_complex, dmtx_l_complex,
-                       mtx_l_complex->get_num_stored_elements() - 1);
-}
-
-
-TEST_F(ParIlut, KernelAddCandidatesIsEquivalentToRef)
-{
-    auto square_size = mtx_square->get_size();
-    auto mtx_lu = Csr::create(ref, square_size);
-    mtx_l2->apply(mtx_u.get(), mtx_lu.get());
-    auto dmtx_lu = Csr::create(omp, square_size);
+    using Csr = typename TestFixture::Csr;
+    using value_type = typename TestFixture::value_type;
+    auto square_size = this->mtx_square->get_size();
+    auto mtx_lu = Csr::create(this->ref, square_size);
+    this->mtx_l2->apply(this->mtx_u.get(), mtx_lu.get());
+    auto dmtx_lu = Csr::create(this->omp, square_size);
     dmtx_lu->copy_from(mtx_lu.get());
-    auto res_mtx_l = Csr::create(ref, square_size);
-    auto res_mtx_u = Csr::create(ref, square_size);
-    auto dres_mtx_l = Csr::create(omp, square_size);
-    auto dres_mtx_u = Csr::create(omp, square_size);
+    auto res_mtx_l = Csr::create(this->ref, square_size);
+    auto res_mtx_u = Csr::create(this->ref, square_size);
+    auto dres_mtx_l = Csr::create(this->omp, square_size);
+    auto dres_mtx_u = Csr::create(this->omp, square_size);
 
     gko::kernels::reference::par_ilut_factorization::add_candidates(
-        ref, mtx_lu.get(), mtx_square.get(), mtx_l2.get(), mtx_u.get(),
-        res_mtx_l.get(), res_mtx_u.get());
+        this->ref, mtx_lu.get(), this->mtx_square.get(), this->mtx_l2.get(),
+        this->mtx_u.get(), res_mtx_l.get(), res_mtx_u.get());
     gko::kernels::omp::par_ilut_factorization::add_candidates(
-        omp, dmtx_lu.get(), dmtx_square.get(), dmtx_l2.get(), dmtx_u.get(),
-        dres_mtx_l.get(), dres_mtx_u.get());
+        this->omp, dmtx_lu.get(), this->dmtx_square.get(), this->dmtx_l2.get(),
+        this->dmtx_u.get(), dres_mtx_l.get(), dres_mtx_u.get());
 
     GKO_ASSERT_MTX_EQ_SPARSITY(res_mtx_l, dres_mtx_l);
     GKO_ASSERT_MTX_EQ_SPARSITY(res_mtx_u, dres_mtx_u);
-    GKO_ASSERT_MTX_NEAR(res_mtx_l, dres_mtx_l, 1e-14);
-    GKO_ASSERT_MTX_NEAR(res_mtx_u, dres_mtx_u, 1e-14);
+    GKO_ASSERT_MTX_NEAR(res_mtx_l, dres_mtx_l, r<value_type>::value);
+    GKO_ASSERT_MTX_NEAR(res_mtx_u, dres_mtx_u, r<value_type>::value);
 }
 
 
-TEST_F(ParIlut, KernelComputeLUIsEquivalentToRef)
+TYPED_TEST(ParIlut, KernelComputeLUIsEquivalentToRef)
 {
-    auto square_size = mtx_ani->get_size();
-    auto mtx_l_coo = Coo::create(ref, square_size);
-    auto mtx_ut_coo = Coo::create(ref, square_size);
-    mtx_l_ani->convert_to(mtx_l_coo.get());
-    mtx_ut_ani->convert_to(mtx_ut_coo.get());
-    auto dmtx_l_coo = Coo::create(omp, square_size);
-    auto dmtx_ut_coo = Coo::create(omp, square_size);
+    using Csr = typename TestFixture::Csr;
+    using Coo = typename TestFixture::Coo;
+    auto square_size = this->mtx_ani->get_size();
+    auto mtx_l_coo = Coo::create(this->ref, square_size);
+    auto mtx_ut_coo = Coo::create(this->ref, square_size);
+    this->mtx_l_ani->convert_to(mtx_l_coo.get());
+    this->mtx_ut_ani->convert_to(mtx_ut_coo.get());
+    auto dmtx_l_coo = Coo::create(this->omp, square_size);
+    auto dmtx_ut_coo = Coo::create(this->omp, square_size);
     dmtx_l_coo->copy_from(mtx_l_coo.get());
     dmtx_ut_coo->copy_from(mtx_ut_coo.get());
 
     gko::kernels::reference::par_ilut_factorization::compute_l_u_factors(
-        ref, mtx_ani.get(), mtx_l_ani.get(), mtx_l_coo.get(), mtx_ut_ani.get(),
-        mtx_ut_coo.get());
+        this->ref, this->mtx_ani.get(), this->mtx_l_ani.get(), mtx_l_coo.get(),
+        this->mtx_ut_ani.get(), mtx_ut_coo.get());
     for (int i = 0; i < 20; ++i) {
         gko::kernels::omp::par_ilut_factorization::compute_l_u_factors(
-            omp, dmtx_ani.get(), dmtx_l_ani.get(), dmtx_l_coo.get(),
-            dmtx_ut_ani.get(), dmtx_ut_coo.get());
+            this->omp, this->dmtx_ani.get(), this->dmtx_l_ani.get(),
+            dmtx_l_coo.get(), this->dmtx_ut_ani.get(), dmtx_ut_coo.get());
     }
 
-    GKO_ASSERT_MTX_NEAR(mtx_l_ani, dmtx_l_ani, 1e-2);
-    GKO_ASSERT_MTX_NEAR(mtx_ut_ani, dmtx_ut_ani, 1e-2);
+    GKO_ASSERT_MTX_NEAR(this->mtx_l_ani, this->dmtx_l_ani, 1e-2);
+    GKO_ASSERT_MTX_NEAR(this->mtx_ut_ani, this->dmtx_ut_ani, 1e-2);
 }
 
 
