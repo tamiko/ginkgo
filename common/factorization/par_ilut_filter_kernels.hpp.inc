@@ -66,9 +66,9 @@ __device__ void abstract_filter_impl(const IndexType *row_ptrs,
 
 
 template <int subwarp_size, typename Predicate, typename IndexType>
-__device__ void abstract_filter_nnz(const IndexType *row_ptrs,
+__device__ void abstract_filter_nnz(const IndexType *__restrict__ row_ptrs,
                                     IndexType num_rows, Predicate pred,
-                                    IndexType *nnz)
+                                    IndexType *__restrict__ nnz)
 {
     IndexType count{};
     abstract_filter_impl<subwarp_size>(
@@ -86,12 +86,14 @@ __device__ void abstract_filter_nnz(const IndexType *row_ptrs,
 
 template <int subwarp_size, typename Predicate, typename IndexType,
           typename ValueType>
-__device__ void abstract_filter(const IndexType *old_row_ptrs,
-                                const IndexType *old_col_idxs,
-                                const ValueType *old_vals, IndexType num_rows,
-                                Predicate pred, const IndexType *new_row_ptrs,
-                                IndexType *new_row_idxs,
-                                IndexType *new_col_idxs, ValueType *new_vals)
+__device__ void abstract_filter(const IndexType *__restrict__ old_row_ptrs,
+                                const IndexType *__restrict__ old_col_idxs,
+                                const ValueType *__restrict__ old_vals,
+                                IndexType num_rows, Predicate pred,
+                                const IndexType *__restrict__ new_row_ptrs,
+                                IndexType *__restrict__ new_row_idxs,
+                                IndexType *__restrict__ new_col_idxs,
+                                ValueType *__restrict__ new_vals)
 {
     IndexType count{};
     IndexType new_offset{};
@@ -117,8 +119,9 @@ __device__ void abstract_filter(const IndexType *old_row_ptrs,
 
 template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void threshold_filter_nnz(
-    const IndexType *row_ptrs, const ValueType *vals, IndexType num_rows,
-    remove_complex<ValueType> threshold, IndexType *nnz)
+    const IndexType *__restrict__ row_ptrs, const ValueType *vals,
+    IndexType num_rows, remove_complex<ValueType> threshold,
+    IndexType *__restrict__ nnz)
 {
     abstract_filter_nnz<subwarp_size>(
         row_ptrs, num_rows,
@@ -131,10 +134,13 @@ __global__ __launch_bounds__(default_block_size) void threshold_filter_nnz(
 
 template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void threshold_filter(
-    const IndexType *old_row_ptrs, const IndexType *old_col_idxs,
-    const ValueType *old_vals, IndexType num_rows,
-    remove_complex<ValueType> threshold, const IndexType *new_row_ptrs,
-    IndexType *new_row_idxs, IndexType *new_col_idxs, ValueType *new_vals)
+    const IndexType *__restrict__ old_row_ptrs,
+    const IndexType *__restrict__ old_col_idxs,
+    const ValueType *__restrict__ old_vals, IndexType num_rows,
+    remove_complex<ValueType> threshold,
+    const IndexType *__restrict__ new_row_ptrs,
+    IndexType *__restrict__ new_row_idxs, IndexType *__restrict__ new_col_idxs,
+    ValueType *__restrict__ new_vals)
 {
     abstract_filter<subwarp_size>(
         old_row_ptrs, old_col_idxs, old_vals, num_rows,
@@ -147,8 +153,8 @@ __global__ __launch_bounds__(default_block_size) void threshold_filter(
 
 template <int subwarp_size, typename IndexType, typename BucketType>
 __global__ __launch_bounds__(default_block_size) void bucket_filter_nnz(
-    const IndexType *row_ptrs, const BucketType *buckets, IndexType num_rows,
-    BucketType bucket, IndexType *nnz)
+    const IndexType *__restrict__ row_ptrs, const BucketType *buckets,
+    IndexType num_rows, BucketType bucket, IndexType *__restrict__ nnz)
 {
     abstract_filter_nnz<subwarp_size>(
         row_ptrs, num_rows,
@@ -162,10 +168,13 @@ __global__ __launch_bounds__(default_block_size) void bucket_filter_nnz(
 template <int subwarp_size, typename ValueType, typename IndexType,
           typename BucketType>
 __global__ __launch_bounds__(default_block_size) void bucket_filter(
-    const IndexType *old_row_ptrs, const IndexType *old_col_idxs,
-    const ValueType *old_vals, const BucketType *buckets, IndexType num_rows,
-    BucketType bucket, const IndexType *new_row_ptrs, IndexType *new_row_idxs,
-    IndexType *new_col_idxs, ValueType *new_vals)
+    const IndexType *__restrict__ old_row_ptrs,
+    const IndexType *__restrict__ old_col_idxs,
+    const ValueType *__restrict__ old_vals, const BucketType *buckets,
+    IndexType num_rows, BucketType bucket,
+    const IndexType *__restrict__ new_row_ptrs,
+    IndexType *__restrict__ new_row_idxs, IndexType *__restrict__ new_col_idxs,
+    ValueType *__restrict__ new_vals)
 {
     abstract_filter<subwarp_size>(
         old_row_ptrs, old_col_idxs, old_vals, num_rows,

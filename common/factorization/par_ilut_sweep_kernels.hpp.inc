@@ -42,11 +42,16 @@ __forceinline__ __device__ bool is_finite(ValueType v)
 
 template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void sweep_sequential(
-    const IndexType *a_row_ptrs, const IndexType *a_col_idxs,
-    const ValueType *a_vals, const IndexType *l_row_ptrs,
-    const IndexType *l_row_idxs, const IndexType *l_col_idxs, ValueType *l_vals,
-    IndexType l_nnz, const IndexType *u_col_ptrs, const IndexType *u_row_idxs,
-    const IndexType *u_col_idxs, ValueType *u_vals, IndexType u_nnz)
+    const IndexType *__restrict__ a_row_ptrs,
+    const IndexType *__restrict__ a_col_idxs,
+    const ValueType *__restrict__ a_vals,
+    const IndexType *__restrict__ l_row_ptrs,
+    const IndexType *__restrict__ l_row_idxs,
+    const IndexType *__restrict__ l_col_idxs, ValueType *__restrict__ l_vals,
+    IndexType l_nnz, const IndexType *__restrict__ u_col_ptrs,
+    const IndexType *__restrict__ u_row_idxs,
+    const IndexType *__restrict__ u_col_idxs, ValueType *__restrict__ u_vals,
+    IndexType u_nnz)
 {
     auto tidx = threadIdx.x + blockIdx.x * blockDim.x;
     if (tidx >= l_nnz + u_nnz) {
@@ -98,11 +103,16 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
 
 template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void sweep(
-    const IndexType *a_row_ptrs, const IndexType *a_col_idxs,
-    const ValueType *a_vals, const IndexType *l_row_ptrs,
-    const IndexType *l_row_idxs, const IndexType *l_col_idxs, ValueType *l_vals,
-    IndexType l_nnz, const IndexType *u_col_ptrs, const IndexType *u_row_idxs,
-    const IndexType *u_col_idxs, ValueType *u_vals, IndexType u_nnz)
+    const IndexType *__restrict__ a_row_ptrs,
+    const IndexType *__restrict__ a_col_idxs,
+    const ValueType *__restrict__ a_vals,
+    const IndexType *__restrict__ l_row_ptrs,
+    const IndexType *__restrict__ l_row_idxs,
+    const IndexType *__restrict__ l_col_idxs, ValueType *__restrict__ l_vals,
+    IndexType l_nnz, const IndexType *__restrict__ u_col_ptrs,
+    const IndexType *__restrict__ u_row_idxs,
+    const IndexType *__restrict__ u_col_idxs, ValueType *__restrict__ u_vals,
+    IndexType u_nnz)
 {
     auto tidx = (threadIdx.x + blockIdx.x * blockDim.x) / subwarp_size;
     if (tidx >= l_nnz + u_nnz) {
