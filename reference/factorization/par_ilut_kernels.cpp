@@ -253,7 +253,8 @@ void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
         auto a_nz_it =
             std::lower_bound(a_col_idxs + a_begin, a_col_idxs + a_end, col);
         auto a_nz = std::distance(a_col_idxs, a_nz_it);
-        auto a_val = a_col_idxs[a_nz] == col ? a_vals[a_nz] : zero<ValueType>();
+        auto has_a = a_nz < a_end && a_col_idxs[a_nz] == col;
+        auto a_val = has_a ? a_vals[a_nz] : zero<ValueType>();
         // accumulate l(row,:) * u(:,col) without the last entry (row, col)
         ValueType sum{};
         auto l_begin = l_row_ptrs[row];
