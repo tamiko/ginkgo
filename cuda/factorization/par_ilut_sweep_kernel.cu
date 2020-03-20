@@ -51,6 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cuda/components/prefix_sum.cuh"
 #include "cuda/components/reduction.cuh"
 #include "cuda/components/searching.cuh"
+#include "cuda/components/thread_ids.cuh"
 
 
 namespace gko {
@@ -102,7 +103,6 @@ void compute_l_u_factors(syn::value_list<int, subwarp_size>,
         static_cast<IndexType>(u_csc->get_num_stored_elements()));
 }
 
-
 GKO_ENABLE_IMPLEMENTATION_SELECTION(select_compute_l_u_factors,
                                     compute_l_u_factors);
 
@@ -131,7 +131,6 @@ void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
         syn::value_list<int>(), syn::type_list<>(), exec, a, l, l_coo, u_csc,
         u_transp_coo);
 }
-
 
 GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
     GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS);

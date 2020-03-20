@@ -49,6 +49,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace gko {
 namespace kernels {
 
+
 #define GKO_DECLARE_PAR_ILUT_ADD_CANDIDATES_KERNEL(ValueType, IndexType) \
     void add_candidates(std::shared_ptr<const DefaultExecutor> exec,     \
                         const matrix::Csr<ValueType, IndexType> *lu,     \

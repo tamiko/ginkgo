@@ -54,12 +54,12 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
     const IndexType *__restrict__ u_col_idxs, ValueType *__restrict__ u_vals,
     IndexType u_nnz)
 {
-    auto tidx = threadIdx.x + blockIdx.x * blockDim.x;
+    auto tidx = thread::get_thread_id_flat<IndexType>();
     if (tidx >= l_nnz + u_nnz) {
         return;
     }
     // split the threads into two halves for lower and upper triangle
-    auto l_nz = static_cast<IndexType>(tidx);
+    auto l_nz = tidx;
     auto u_nz = l_nz - l_nnz;
     auto lower = u_nz < 0;
     auto row = lower ? l_row_idxs[l_nz] : u_row_idxs[u_nz];
@@ -122,12 +122,12 @@ __global__ __launch_bounds__(default_block_size) void sweep(
     const IndexType *__restrict__ u_col_idxs, ValueType *__restrict__ u_vals,
     IndexType u_nnz)
 {
-    auto tidx = (threadIdx.x + blockIdx.x * blockDim.x) / subwarp_size;
+    auto tidx = thread::get_subwarp_id_flat<subwarp_size, IndexType>();
     if (tidx >= l_nnz + u_nnz) {
         return;
     }
     // split the subwarps into two halves for lower and upper triangle
-    auto l_nz = static_cast<IndexType>(tidx);
+    auto l_nz = tidx;
     auto u_nz = l_nz - l_nnz;
     auto lower = u_nz < 0;
     auto row = lower ? l_row_idxs[l_nz] : u_row_idxs[u_nz];

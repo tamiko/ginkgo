@@ -57,6 +57,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cuda/components/intrinsics.cuh"
 #include "cuda/components/prefix_sum.cuh"
 #include "cuda/components/sorting.cuh"
+#include "cuda/components/thread_ids.cuh"
 #include "cuda/factorization/par_ilut_select_common.cuh"
 
 

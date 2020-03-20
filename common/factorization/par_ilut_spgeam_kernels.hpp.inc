@@ -44,8 +44,7 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_nnz(
 {
     auto subwarp =
         group::tiled_partition<subwarp_size>(group::this_thread_block());
-    auto row =
-        (threadIdx.x + size_type(blockDim.x) * blockIdx.x) / subwarp_size;
+    auto row = thread::get_subwarp_id_flat<subwarp_size, IndexType>();
     if (row >= num_rows) {
         return;
     }
@@ -83,7 +82,7 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_nnz_sequential(
     IndexType *__restrict__ l_new_row_ptrs,
     IndexType *__restrict__ u_new_row_ptrs, IndexType num_rows)
 {
-    auto row = threadIdx.x + size_type(blockDim.x) * blockIdx.x;
+    auto row = thread::get_thread_id_flat<IndexType>();
     if (row >= num_rows) {
         return;
     }
@@ -130,8 +129,7 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
 {
     auto subwarp =
         group::tiled_partition<subwarp_size>(group::this_thread_block());
-    auto row =
-        (threadIdx.x + size_type(blockDim.x) * blockIdx.x) / subwarp_size;
+    auto row = thread::get_subwarp_id_flat<subwarp_size, IndexType>();
     if (row >= num_rows) {
         return;
     }
@@ -330,7 +328,7 @@ __global__
         IndexType *__restrict__ u_new_col_idxs,
         ValueType *__restrict__ u_new_vals, IndexType num_rows)
 {
-    auto row = threadIdx.x + size_type(blockDim.x) * blockIdx.x;
+    auto row = thread::get_thread_id_flat<IndexType>();
     if (row >= num_rows) {
         return;
     }

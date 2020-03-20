@@ -51,6 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cuda/components/merging.cuh"
 #include "cuda/components/prefix_sum.cuh"
 #include "cuda/components/searching.cuh"
+#include "cuda/components/thread_ids.cuh"
 
 
 namespace gko {

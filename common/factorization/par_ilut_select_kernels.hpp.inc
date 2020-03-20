@@ -65,7 +65,7 @@ __global__ __launch_bounds__(searchtree_width) void build_searchtree(
     }
     __shared__ AbsType sh_samples[sample_size];
     bitonic_sort<sample_size, oversampling_factor>(samples, sh_samples);
-    if (threadIdx.x > 0) {
+    if (idx > 0) {
         // root has level 0
         auto level = searchtree_height - ffs(threadIdx.x);
         // we get the in-level index by removing trailing 10000...
@@ -97,10 +97,11 @@ __global__ __launch_bounds__(default_block_size) void count_buckets(
     group::this_thread_block().sync();
 
     // work distribution: each thread block gets a consecutive index range
-    auto begin =
-        threadIdx.x + default_block_size * blockIdx.x * items_per_thread;
-    IndexType block_end =
-        default_block_size * (blockIdx.x + 1) * items_per_thread;
+    auto begin = threadIdx.x + default_block_size *
+                                   static_cast<IndexType>(blockIdx.x) *
+                                   items_per_thread;
+    auto block_end = default_block_size *
+                     static_cast<IndexType>(blockIdx.x + 1) * items_per_thread;
     auto end = min(block_end, size);
     for (IndexType i = begin; i < end; i += default_block_size) {
         // traverse the search tree with the input element
@@ -212,10 +213,11 @@ __global__ __launch_bounds__(default_block_size) void filter_bucket(
     group::this_thread_block().sync();
 
     // same work-distribution as in count_buckets
-    auto begin =
-        threadIdx.x + default_block_size * blockIdx.x * items_per_thread;
-    IndexType block_end =
-        default_block_size * (blockIdx.x + 1) * items_per_thread;
+    auto begin = threadIdx.x + default_block_size *
+                                   static_cast<IndexType>(blockIdx.x) *
+                                   items_per_thread;
+    auto block_end = default_block_size *
+                     static_cast<IndexType>(blockIdx.x + 1) * items_per_thread;
     auto end = min(block_end, size);
     for (IndexType i = begin; i < end; i += default_block_size) {
         // only copy the element when it belongs to the target bucket

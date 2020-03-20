@@ -60,6 +60,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "hip/components/intrinsics.hip.hpp"
 #include "hip/components/prefix_sum.hip.hpp"
 #include "hip/components/sorting.hip.hpp"
+#include "hip/components/thread_ids.hip.hpp"
 #include "hip/factorization/par_ilut_select_common.hip.hpp"
 
 
