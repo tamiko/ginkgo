@@ -132,7 +132,7 @@ __device__ detail::merge_result<ValueType> group_merge_step(ValueType a,
  *                  `valid` specifies if the current thread has to merge an
  *                  element (this is necessary for shfl and ballot operations).
  */
-template <int group_size, typename IndexType, typename ValueType,
+template <int group_size, typename ValueType, typename IndexType,
           typename Group, typename Callback>
 __device__ void group_merge(const ValueType *a, IndexType a_size,
                             const ValueType *b, IndexType b_size, Group group,
@@ -200,7 +200,7 @@ __device__ void group_merge(const ValueType *a, IndexType a_size,
  *                   `*_val` and `*_idx` are the values resp. the indices of the
  *                   values from a/b being compared at output index `c_index`.
  */
-template <typename IndexType, typename ValueType, typename Callback>
+template <typename ValueType, typename IndexType, typename Callback>
 __device__ void sequential_merge(const ValueType *a, IndexType a_size,
                                  const ValueType *b, IndexType b_size,
                                  Callback merge_fn)

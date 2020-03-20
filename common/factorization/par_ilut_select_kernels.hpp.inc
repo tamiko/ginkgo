@@ -47,7 +47,7 @@ constexpr auto basecase_block_size = basecase_size / basecase_local_size;
 
 
 // must be launched with one thread block and block size == searchtree_width
-template <typename IndexType, typename ValueType>
+template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(searchtree_width) void build_searchtree(
     const ValueType *input, IndexType size,
     remove_complex<ValueType> *tree_output)
@@ -79,7 +79,7 @@ __global__ __launch_bounds__(searchtree_width) void build_searchtree(
 
 
 // must be launched with default_block_size >= searchtree_width
-template <typename IndexType, typename ValueType>
+template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void count_buckets(
     const ValueType *input, IndexType size,
     const remove_complex<ValueType> *tree, IndexType *counter,
@@ -197,7 +197,7 @@ __global__ __launch_bounds__(default_block_size) void block_prefix_sum(
 
 
 // must be launched with default_block_size >= searchtree_width
-template <typename IndexType, typename ValueType>
+template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void filter_bucket(
     const ValueType *input, IndexType size, unsigned char bucket,
     const unsigned char *oracles, const IndexType *block_offsets,
@@ -227,7 +227,7 @@ __global__ __launch_bounds__(default_block_size) void filter_bucket(
 }
 
 
-template <typename IndexType, typename ValueType>
+template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(basecase_block_size) void basecase_select(
     const ValueType *input, IndexType size, IndexType rank, ValueType *out)
 {

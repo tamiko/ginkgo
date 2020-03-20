@@ -40,7 +40,7 @@ __forceinline__ __device__ bool is_finite(ValueType v)
 }
 
 
-template <int subwarp_size, typename IndexType, typename ValueType>
+template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void sweep_sequential(
     const IndexType *a_row_ptrs, const IndexType *a_col_idxs,
     const ValueType *a_vals, const IndexType *l_row_ptrs,
@@ -96,7 +96,7 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
 }
 
 
-template <int subwarp_size, typename IndexType, typename ValueType>
+template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void sweep(
     const IndexType *a_row_ptrs, const IndexType *a_col_idxs,
     const ValueType *a_vals, const IndexType *l_row_ptrs,

@@ -115,7 +115,7 @@ __device__ void abstract_filter(const IndexType *old_row_ptrs,
 }
 
 
-template <int subwarp_size, typename IndexType, typename ValueType>
+template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void threshold_filter_nnz(
     const IndexType *row_ptrs, const ValueType *vals, IndexType num_rows,
     remove_complex<ValueType> threshold, IndexType *nnz)
@@ -129,7 +129,7 @@ __global__ __launch_bounds__(default_block_size) void threshold_filter_nnz(
 }
 
 
-template <int subwarp_size, typename IndexType, typename ValueType>
+template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void threshold_filter(
     const IndexType *old_row_ptrs, const IndexType *old_col_idxs,
     const ValueType *old_vals, IndexType num_rows,
@@ -159,7 +159,7 @@ __global__ __launch_bounds__(default_block_size) void bucket_filter_nnz(
 }
 
 
-template <int subwarp_size, typename IndexType, typename ValueType,
+template <int subwarp_size, typename ValueType, typename IndexType,
           typename BucketType>
 __global__ __launch_bounds__(default_block_size) void bucket_filter(
     const IndexType *old_row_ptrs, const IndexType *old_col_idxs,
