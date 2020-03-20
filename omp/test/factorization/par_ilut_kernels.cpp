@@ -435,7 +435,7 @@ TEST_F(ParIlut, KernelComputeLUIsEquivalentToRef)
     gko::kernels::reference::par_ilut_factorization::compute_l_u_factors(
         ref, mtx_ani.get(), mtx_l_ani.get(), mtx_l_coo.get(), mtx_ut_ani.get(),
         mtx_ut_coo.get());
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 20; ++i) {
         gko::kernels::omp::par_ilut_factorization::compute_l_u_factors(
             omp, dmtx_ani.get(), dmtx_l_ani.get(), dmtx_l_coo.get(),
             dmtx_ut_ani.get(), dmtx_ut_coo.get());
