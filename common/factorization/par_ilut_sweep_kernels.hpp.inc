@@ -33,6 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace kernel {
 
 
+// workaround for compilation issues with CUDA 10.0/clang
 template <typename ValueType>
 __forceinline__ __device__ bool is_finite(ValueType v)
 {
@@ -57,6 +58,7 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
     if (tidx >= l_nnz + u_nnz) {
         return;
     }
+    // split the threads into two halves for lower and upper triangle
     auto l_nz = static_cast<IndexType>(tidx);
     auto u_nz = l_nz - l_nnz;
     auto lower = u_nz < 0;
@@ -66,12 +68,14 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
         // don't update the diagonal twice
         return;
     }
+    // find entry of A corresponding to entry of L/U
     auto a_row_begin = a_row_ptrs[row];
     auto a_row_size = a_row_ptrs[row + 1] - a_row_begin;
     auto a_idx = binary_search(a_row_begin, a_row_size, [&](IndexType i) {
         return a_col_idxs[i] >= col;
     });
     auto a_val = a_col_idxs[a_idx] == col ? a_vals[a_idx] : zero<ValueType>();
+    // find matching column/row indices from L and U
     auto l_row_begin = l_row_ptrs[row];
     auto l_row_size = l_row_ptrs[row + 1] - l_row_begin;
     auto u_col_begin = u_col_ptrs[col];
@@ -82,6 +86,10 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
                      u_row_idxs + u_col_begin, u_col_size,
                      [&](IndexType l_idx, IndexType l_col, IndexType u_idx,
                          IndexType u_row, IndexType) {
+                         /* this is equivalent to the last_product approach
+                          * because the row of L has column index <= row
+                          * and the column of U has row index <= col
+                          * so the last entry will always be the diagonal */
                          if (l_col == u_row && l_col < last_entry) {
                              sum += l_vals[l_idx + l_row_begin] *
                                     u_vals[u_idx + u_col_begin];
@@ -118,6 +126,7 @@ __global__ __launch_bounds__(default_block_size) void sweep(
     if (tidx >= l_nnz + u_nnz) {
         return;
     }
+    // split the subwarps into two halves for lower and upper triangle
     auto l_nz = static_cast<IndexType>(tidx);
     auto u_nz = l_nz - l_nnz;
     auto lower = u_nz < 0;
@@ -129,6 +138,7 @@ __global__ __launch_bounds__(default_block_size) void sweep(
     }
     auto subwarp =
         group::tiled_partition<subwarp_size>(group::this_thread_block());
+    // find entry of A at (row, col)
     auto a_row_begin = a_row_ptrs[row];
     auto a_row_size = a_row_ptrs[row + 1] - a_row_begin;
     auto a_idx =
@@ -146,6 +156,8 @@ __global__ __launch_bounds__(default_block_size) void sweep(
         u_col_size, subwarp,
         [&](IndexType l_idx, IndexType l_col, IndexType u_idx, IndexType u_row,
             IndexType, bool) {
+            // we don't need to use the `bool valid` because last_entry is
+            // already a smaller sentinel value than the one used in group_merge
             if (l_col == u_row && l_col < last_entry) {
                 sum +=
                     l_vals[l_idx + l_row_begin] * u_vals[u_idx + u_col_begin];

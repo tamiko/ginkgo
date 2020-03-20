@@ -123,7 +123,7 @@ void threshold_select(std::shared_ptr<const DefaultExecutor> exec,
 
     ssss_count(values, size, tree, oracles, partial_counts, total_counts);
 
-    // determine bucket with correct rank
+    // determine bucket with correct rank, use bucket-local rank
     auto bucket = ssss_find_bucket(exec, total_counts, rank);
     rank -= bucket.begin;
 

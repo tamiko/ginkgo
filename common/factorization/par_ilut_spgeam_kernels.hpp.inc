@@ -149,6 +149,8 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
     auto u_end = u_row_ptrs[row + 1];
     auto u_size = u_end - u_begin;
 
+    // lpu_* stores the entries of L + U with the diagonal from U
+    // this allows us to act as if L and U were a single matrix
     auto lpu_begin = l_begin;
     auto lpu_end = lpu_begin + l_size + u_size;
     auto lpu_col_idxs =
@@ -171,6 +173,7 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
     IndexType u_new_begin = u_new_row_ptrs[row];
 
     constexpr auto sentinel = device_numeric_limits<IndexType>::max;
+    // load column indices and values for the first merge step
     auto a_col = checked_load(a_col_idxs, a_begin + lane, a_end, sentinel);
     auto a_val = checked_load(a_vals, a_begin + lane, a_end, zero<ValueType>());
     auto lu_col = checked_load(lu_col_idxs, lu_begin + lane, lu_end, sentinel);
@@ -182,6 +185,7 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
         checked_load(lpu_vals, lpu_begin + lane, lpu_end, zero<ValueType>());
     bool skip_first{};
     while (out_begin < out_size) {
+        // merge subwarp.size() elements from A and L*U
         auto merge_result =
             group_merge_step<subwarp_size>(a_col, lu_col, subwarp);
         auto a_cur_col = merge_result.a_val;
@@ -196,12 +200,14 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
         auto prev_equal = bool(prev_equal_mask & lanemask_eq);
 
         auto r_col = min(a_cur_col, lu_cur_col);
+        // find matching entry of L+U
         // S(L + U) is a subset of S(A - L * U) since L and U have a diagonal
         auto lpu_source = synchronous_fixed_binary_search<subwarp_size>(
             [&](int i) { return subwarp.shfl(lpu_col, i) >= r_col; });
         auto lpu_cur_col = subwarp.shfl(lpu_col, lpu_source);
         auto lpu_cur_val = subwarp.shfl(lpu_val, lpu_source);
 
+        // determine actual values of A and L*U at r_col
         if (r_col != a_cur_col) {
             a_cur_val = zero<ValueType>();
         }
@@ -209,11 +215,14 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
             lu_cur_val = zero<ValueType>();
         }
         auto r_val = a_cur_val - lu_cur_val;
+
+        // determine which threads will write output to L or U
         auto use_lpu = lpu_cur_col == r_col;
         auto l_new_advance_mask =
             subwarp.ballot(r_col <= row && !prev_equal && valid);
         auto u_new_advance_mask =
             subwarp.ballot(r_col >= row && !prev_equal && valid);
+        // store values
         if (!prev_equal && valid) {
             auto diag =
                 r_col < row ? u_vals[u_row_ptrs[r_col]] : one<ValueType>();
@@ -231,6 +240,7 @@ __global__ __launch_bounds__(default_block_size) void tri_spgeam_init(
             }
         }
 
+        // advance *_begin offsets
         auto a_advance = merge_result.a_advance;
         auto lu_advance = merge_result.b_advance;
         auto lpu_advance =
@@ -360,7 +370,7 @@ __global__
         auto a_advance = out_col == a_col;
         auto lu_advance = out_col == lu_col;
         auto lpu_advance = out_col == lpu_col;
-        // assert a_advance || lu_advance since L*U contains L+I (symbolically)
+        // assert a_advance || lu_advance since L*U contains L+U (symbolically)
         auto a_val = a_advance ? a_vals[a_begin] : zero<ValueType>();
         auto lu_val = lu_advance ? lu_vals[lu_begin] : zero<ValueType>();
         auto r_val = a_val - lu_val;
