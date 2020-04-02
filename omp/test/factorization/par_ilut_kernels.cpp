@@ -204,10 +204,9 @@ protected:
         auto dres = Csr::create(omp, mtx_size);
         auto res_coo = Coo::create(ref, mtx_size);
         auto dres_coo = Coo::create(omp, mtx_size);
-        auto local_mtx = std::unique_ptr<Csr>{gko::as<Csr>(
-            lower ? mtx->clone().release() : mtx->transpose().release())};
-        auto local_dmtx = std::unique_ptr<Csr>{gko::as<Csr>(
-            lower ? dmtx->clone().release() : dmtx->transpose().release())};
+        auto local_mtx = gko::as<Csr>(lower ? mtx->clone() : mtx->transpose());
+        auto local_dmtx =
+            gko::as<Csr>(lower ? dmtx->clone() : dmtx->transpose());
 
         gko::kernels::reference::par_ilut_factorization::threshold_filter(
             ref, local_mtx.get(), threshold, res.get(), res_coo.get(), lower);

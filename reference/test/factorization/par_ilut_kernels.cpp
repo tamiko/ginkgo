@@ -228,11 +228,9 @@ protected:
         auto res_mtx = Mtx::create(exec, mtx->get_size());
         auto res_mtx_coo = Coo::create(exec, mtx->get_size());
 
-        std::unique_ptr<Mtx> local_mtx{gko::as<Mtx>(
-            lower ? mtx->clone().release() : mtx->transpose().release())};
-        std::unique_ptr<Mtx> local_expected{
-            gko::as<Mtx>(lower ? expected->clone().release()
-                               : expected->transpose().release())};
+        auto local_mtx = gko::as<Mtx>(lower ? mtx->clone() : mtx->transpose());
+        auto local_expected =
+            gko::as<Mtx>(lower ? expected->clone() : expected->transpose());
 
         gko::kernels::reference::par_ilut_factorization::threshold_filter(
             ref, local_mtx.get(), threshold, res_mtx.get(), res_mtx_coo.get(),
