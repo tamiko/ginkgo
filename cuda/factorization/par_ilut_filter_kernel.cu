@@ -84,7 +84,7 @@ void threshold_filter(syn::value_list<int, subwarp_size>,
                       const matrix::Csr<ValueType, IndexType> *a,
                       remove_complex<ValueType> threshold,
                       matrix::Csr<ValueType, IndexType> *m_out,
-                      matrix::Coo<ValueType, IndexType> *m_out_coo)
+                      matrix::Coo<ValueType, IndexType> *m_out_coo, bool lower)
 {
     auto old_row_ptrs = a->get_const_row_ptrs();
     auto old_col_idxs = a->get_const_col_idxs();
@@ -97,7 +97,7 @@ void threshold_filter(syn::value_list<int, subwarp_size>,
     kernel::threshold_filter_nnz<subwarp_size>
         <<<num_blocks, default_block_size>>>(old_row_ptrs,
                                              as_cuda_type(old_vals), num_rows,
-                                             threshold, new_row_ptrs);
+                                             threshold, new_row_ptrs, lower);
 
     // build row pointers
     prefix_sum(exec, new_row_ptrs, num_rows + 1);
@@ -112,14 +112,18 @@ void threshold_filter(syn::value_list<int, subwarp_size>,
     builder.get_value_array().resize_and_reset(new_nnz);
     auto new_col_idxs = m_out->get_col_idxs();
     auto new_vals = m_out->get_values();
-    matrix::CooBuilder<ValueType, IndexType> coo_builder{m_out_coo};
-    coo_builder.get_row_idx_array().resize_and_reset(new_nnz);
-    coo_builder.get_col_idx_array().make_view(exec, new_nnz, new_col_idxs);
-    coo_builder.get_value_array().make_view(exec, new_nnz, new_vals);
-    auto new_row_idxs = m_out_coo->get_row_idxs();
+    IndexType *new_row_idxs{};
+    if (m_out_coo) {
+        matrix::CooBuilder<ValueType, IndexType> coo_builder{m_out_coo};
+        coo_builder.get_row_idx_array().resize_and_reset(new_nnz);
+        coo_builder.get_col_idx_array().make_view(exec, new_nnz, new_col_idxs);
+        coo_builder.get_value_array().make_view(exec, new_nnz, new_vals);
+        new_row_idxs = m_out_coo->get_row_idxs();
+    }
     kernel::threshold_filter<subwarp_size><<<num_blocks, default_block_size>>>(
         old_row_ptrs, old_col_idxs, as_cuda_type(old_vals), num_rows, threshold,
-        new_row_ptrs, new_row_idxs, new_col_idxs, as_cuda_type(new_vals));
+        new_row_ptrs, new_row_idxs, new_col_idxs, as_cuda_type(new_vals),
+        lower);
 }
 
 
@@ -133,7 +137,7 @@ void threshold_filter(std::shared_ptr<const DefaultExecutor> exec,
                       const matrix::Csr<ValueType, IndexType> *a,
                       remove_complex<ValueType> threshold,
                       matrix::Csr<ValueType, IndexType> *m_out,
-                      matrix::Coo<ValueType, IndexType> *m_out_coo)
+                      matrix::Coo<ValueType, IndexType> *m_out_coo, bool lower)
 {
     auto num_rows = a->get_size()[0];
     auto total_nnz = a->get_num_stored_elements();
@@ -145,7 +149,7 @@ void threshold_filter(std::shared_ptr<const DefaultExecutor> exec,
                    compiled_subwarp_size == config::warp_size;
         },
         syn::value_list<int>(), syn::type_list<>(), exec, a, threshold, m_out,
-        m_out_coo);
+        m_out_coo, lower);
 }
 
 

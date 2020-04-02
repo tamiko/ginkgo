@@ -85,11 +85,12 @@ void compute_l_u_factors(syn::value_list<int, subwarp_size>,
                          const matrix::Csr<ValueType, IndexType> *a,
                          matrix::Csr<ValueType, IndexType> *l,
                          const matrix::Coo<ValueType, IndexType> *l_coo,
-                         matrix::Csr<ValueType, IndexType> *u_csc,
-                         const matrix::Coo<ValueType, IndexType> *u_transp_coo)
+                         matrix::Csr<ValueType, IndexType> *u,
+                         const matrix::Coo<ValueType, IndexType> *u_coo,
+                         matrix::Csr<ValueType, IndexType> *u_csc)
 {
     auto total_nnz = static_cast<IndexType>(l->get_num_stored_elements() +
-                                            u_csc->get_num_stored_elements());
+                                            u->get_num_stored_elements());
     auto block_size = default_block_size / subwarp_size;
     auto num_blocks = ceildiv(total_nnz, block_size);
     kernel::sweep<subwarp_size><<<num_blocks, default_block_size>>>(
@@ -98,9 +99,10 @@ void compute_l_u_factors(syn::value_list<int, subwarp_size>,
         l_coo->get_const_row_idxs(), l->get_const_col_idxs(),
         as_cuda_type(l->get_values()),
         static_cast<IndexType>(l->get_num_stored_elements()),
-        u_csc->get_const_row_ptrs(), u_csc->get_const_col_idxs(),
-        u_transp_coo->get_const_row_idxs(), as_cuda_type(u_csc->get_values()),
-        static_cast<IndexType>(u_csc->get_num_stored_elements()));
+        u_coo->get_const_row_idxs(), u_coo->get_const_col_idxs(),
+        as_cuda_type(u->get_values()), u_csc->get_const_row_ptrs(),
+        u_csc->get_const_col_idxs(), as_cuda_type(u_csc->get_values()),
+        static_cast<IndexType>(u->get_num_stored_elements()));
 }
 
 GKO_ENABLE_IMPLEMENTATION_SELECTION(select_compute_l_u_factors,
@@ -115,12 +117,13 @@ void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
                          const matrix::Csr<ValueType, IndexType> *a,
                          matrix::Csr<ValueType, IndexType> *l,
                          const matrix::Coo<ValueType, IndexType> *l_coo,
-                         matrix::Csr<ValueType, IndexType> *u_csc,
-                         const matrix::Coo<ValueType, IndexType> *u_transp_coo)
+                         matrix::Csr<ValueType, IndexType> *u,
+                         const matrix::Coo<ValueType, IndexType> *u_coo,
+                         matrix::Csr<ValueType, IndexType> *u_csc)
 {
     auto num_rows = a->get_size()[0];
     auto total_nnz =
-        l->get_num_stored_elements() + u_csc->get_num_stored_elements();
+        l->get_num_stored_elements() + u->get_num_stored_elements();
     auto total_nnz_per_row = total_nnz / num_rows;
     select_compute_l_u_factors(
         compiled_kernels(),
@@ -128,12 +131,12 @@ void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
             return total_nnz_per_row <= compiled_subwarp_size ||
                    compiled_subwarp_size == config::warp_size;
         },
-        syn::value_list<int>(), syn::type_list<>(), exec, a, l, l_coo, u_csc,
-        u_transp_coo);
+        syn::value_list<int>(), syn::type_list<>(), exec, a, l, l_coo, u, u_coo,
+        u_csc);
 }
 
 GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
-    GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS);
+    GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS_KERNEL);
 
 
 }  // namespace par_ilut_factorization

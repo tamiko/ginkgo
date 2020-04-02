@@ -34,6 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include <algorithm>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -119,11 +120,14 @@ void abstract_filter(std::shared_ptr<const DefaultExecutor> exec,
     builder.get_value_array().resize_and_reset(new_nnz);
     auto new_col_idxs = m_out->get_col_idxs();
     auto new_vals = m_out->get_values();
-    matrix::CooBuilder<ValueType, IndexType> coo_builder{m_out_coo};
-    coo_builder.get_row_idx_array().resize_and_reset(new_nnz);
-    coo_builder.get_col_idx_array().make_view(exec, new_nnz, new_col_idxs);
-    coo_builder.get_value_array().make_view(exec, new_nnz, new_vals);
-    auto new_row_idxs = m_out_coo->get_row_idxs();
+    IndexType *new_row_idxs{};
+    if (m_out_coo) {
+        matrix::CooBuilder<ValueType, IndexType> coo_builder{m_out_coo};
+        coo_builder.get_row_idx_array().resize_and_reset(new_nnz);
+        coo_builder.get_col_idx_array().make_view(exec, new_nnz, new_col_idxs);
+        coo_builder.get_value_array().make_view(exec, new_nnz, new_vals);
+        new_row_idxs = m_out_coo->get_row_idxs();
+    }
 
     for (size_type row = 0; row < num_rows; ++row) {
         auto new_nz = new_row_ptrs[row];
@@ -131,7 +135,9 @@ void abstract_filter(std::shared_ptr<const DefaultExecutor> exec,
         auto end = row_ptrs[row + 1];
         for (auto nz = begin; nz < end; ++nz) {
             if (pred(row, nz)) {
-                new_row_idxs[new_nz] = row;
+                if (new_row_idxs) {
+                    new_row_idxs[new_nz] = row;
+                }
                 new_col_idxs[new_nz] = col_idxs[nz];
                 new_vals[new_nz] = vals[nz];
                 ++new_nz;
@@ -146,7 +152,7 @@ void threshold_filter(std::shared_ptr<const DefaultExecutor> exec,
                       const matrix::Csr<ValueType, IndexType> *a,
                       remove_complex<ValueType> threshold,
                       matrix::Csr<ValueType, IndexType> *m_out,
-                      matrix::Coo<ValueType, IndexType> *m_out_coo)
+                      matrix::Coo<ValueType, IndexType> *m_out_coo, bool)
 {
     auto col_idxs = a->get_const_col_idxs();
     auto vals = a->get_const_values();
@@ -170,6 +176,7 @@ template <typename ValueType, typename IndexType>
 void threshold_filter_approx(std::shared_ptr<const DefaultExecutor> exec,
                              const matrix::Csr<ValueType, IndexType> *m,
                              IndexType rank, Array<ValueType> &tmp,
+                             remove_complex<ValueType> &threshold,
                              matrix::Csr<ValueType, IndexType> *m_out,
                              matrix::Coo<ValueType, IndexType> *m_out_coo)
 {
@@ -212,13 +219,13 @@ void threshold_filter_approx(std::shared_ptr<const DefaultExecutor> exec,
     // prefix_sum[bucket] <= rank < prefix_sum[bucket + 1]
     auto it = std::upper_bound(histogram, histogram + bucket_count + 1, rank);
     auto threshold_bucket = std::distance(histogram + 1, it);
+    // sample contains upper bounds for the buckets
+    threshold = threshold_bucket > 0 ? sample[threshold_bucket - 1]
+                                     : zero<remove_complex<ValueType>>();
     // filter elements
     abstract_filter(
         exec, m, m_out, m_out_coo, [&](IndexType row, IndexType nz) {
-            auto bucket_it = std::upper_bound(sample, sample + bucket_count - 1,
-                                              abs(vals[nz]));
-            auto bucket = std::distance(sample, bucket_it);
-            return bucket >= threshold_bucket || col_idxs[nz] == row;
+            return abs(vals[nz]) >= threshold || col_idxs[nz] == row;
         });
 }
 
@@ -232,16 +239,20 @@ void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
                          const matrix::Csr<ValueType, IndexType> *a,
                          matrix::Csr<ValueType, IndexType> *l,
                          const matrix::Coo<ValueType, IndexType> *,
-                         matrix::Csr<ValueType, IndexType> *u_csc,
-                         const matrix::Coo<ValueType, IndexType> *)
+                         matrix::Csr<ValueType, IndexType> *u,
+                         const matrix::Coo<ValueType, IndexType> *,
+                         matrix::Csr<ValueType, IndexType> *u_csc)
 {
     auto num_rows = a->get_size()[0];
     auto l_row_ptrs = l->get_const_row_ptrs();
     auto l_col_idxs = l->get_const_col_idxs();
     auto l_vals = l->get_values();
-    auto u_col_ptrs = u_csc->get_const_row_ptrs();
-    auto u_row_idxs = u_csc->get_const_col_idxs();
-    auto u_vals = u_csc->get_values();
+    auto u_row_ptrs = u->get_const_row_ptrs();
+    auto u_col_idxs = u->get_const_col_idxs();
+    auto u_vals = u->get_values();
+    auto ut_col_ptrs = u_csc->get_const_row_ptrs();
+    auto ut_row_idxs = u_csc->get_const_col_idxs();
+    auto ut_vals = u_csc->get_values();
     auto a_row_ptrs = a->get_const_row_ptrs();
     auto a_col_idxs = a->get_const_col_idxs();
     auto a_vals = a->get_const_values();
@@ -257,38 +268,46 @@ void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
         auto a_val = has_a ? a_vals[a_nz] : zero<ValueType>();
         // accumulate l(row,:) * u(:,col) without the last entry (row, col)
         ValueType sum{};
+        IndexType ut_nz{};
         auto l_begin = l_row_ptrs[row];
         auto l_end = l_row_ptrs[row + 1];
-        auto u_begin = u_col_ptrs[col];
-        auto u_end = u_col_ptrs[col + 1];
+        auto u_begin = ut_col_ptrs[col];
+        auto u_end = ut_col_ptrs[col + 1];
         auto last_entry = min(row, col);
         while (l_begin < l_end && u_begin < u_end) {
             auto l_col = l_col_idxs[l_begin];
-            auto u_row = u_row_idxs[u_begin];
+            auto u_row = ut_row_idxs[u_begin];
             if (l_col == u_row && l_col < last_entry) {
-                sum += l_vals[l_begin] * u_vals[u_begin];
+                sum += l_vals[l_begin] * ut_vals[u_begin];
+            }
+            if (u_row == row) {
+                ut_nz = u_begin;
             }
             l_begin += (l_col <= u_row);
             u_begin += (u_row <= l_col);
         }
-        return a_val - sum;
+        return std::make_pair(a_val - sum, ut_nz);
     };
 
-    for (size_type i = 0; i < num_rows; ++i) {
-        for (size_type l_nz = l_row_ptrs[i]; l_nz < l_row_ptrs[i + 1] - 1;
+    for (size_type row = 0; row < num_rows; ++row) {
+        for (size_type l_nz = l_row_ptrs[row]; l_nz < l_row_ptrs[row + 1] - 1;
              ++l_nz) {
             auto col = l_col_idxs[l_nz];
-            auto u_diag = u_vals[u_col_ptrs[col + 1] - 1];
-            auto new_val = compute_sum(i, col) / u_diag;
+            auto u_diag = ut_vals[ut_col_ptrs[col + 1] - 1];
+            auto new_val = compute_sum(row, col).first / u_diag;
             if (::gko::isfinite(new_val)) {
                 l_vals[l_nz] = new_val;
             }
         }
-        for (size_type u_nz = u_col_ptrs[i]; u_nz < u_col_ptrs[i + 1]; ++u_nz) {
-            auto row = u_row_idxs[u_nz];
-            auto new_val = compute_sum(row, i);
+        for (size_type u_nz = u_row_ptrs[row]; u_nz < u_row_ptrs[row + 1];
+             ++u_nz) {
+            auto col = u_col_idxs[u_nz];
+            auto result = compute_sum(row, col);
+            auto new_val = result.first;
+            auto ut_nz = result.second;
             if (::gko::isfinite(new_val)) {
                 u_vals[u_nz] = new_val;
+                ut_vals[ut_nz] = new_val;
             }
         }
     }
@@ -296,7 +315,7 @@ void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
 
 
 GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
-    GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS);
+    GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS_KERNEL);
 
 
 template <typename ValueType, typename IndexType, typename BeginCallback,

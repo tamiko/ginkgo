@@ -86,6 +86,7 @@ void threshold_filter_approx(syn::value_list<int, subwarp_size>,
                              std::shared_ptr<const DefaultExecutor> exec,
                              const matrix::Csr<ValueType, IndexType> *m,
                              IndexType rank, Array<ValueType> *tmp,
+                             remove_complex<ValueType> *threshold,
                              matrix::Csr<ValueType, IndexType> *m_out,
                              matrix::Coo<ValueType, IndexType> *m_out_coo)
 {
@@ -122,6 +123,13 @@ void threshold_filter_approx(syn::value_list<int, subwarp_size>,
     // determine bucket with correct rank
     auto bucket = static_cast<unsigned char>(
         ssss_find_bucket(exec, total_counts, rank).idx);
+    exec->get_master()->copy_from(exec.get(), 1,
+                                  tree + kernel::searchtree_inner_size + bucket,
+                                  threshold);
+    // we implicitly set the first splitter to -inf, but 0 works as well
+    if (bucket == 0) {
+        *threshold = zero<AbsType>();
+    }
 
     // filter the elements
     auto old_row_ptrs = m->get_const_row_ptrs();
@@ -168,6 +176,7 @@ template <typename ValueType, typename IndexType>
 void threshold_filter_approx(std::shared_ptr<const DefaultExecutor> exec,
                              const matrix::Csr<ValueType, IndexType> *m,
                              IndexType rank, Array<ValueType> &tmp,
+                             remove_complex<ValueType> &threshold,
                              matrix::Csr<ValueType, IndexType> *m_out,
                              matrix::Coo<ValueType, IndexType> *m_out_coo)
 {
@@ -180,8 +189,8 @@ void threshold_filter_approx(std::shared_ptr<const DefaultExecutor> exec,
             return total_nnz_per_row <= compiled_subwarp_size ||
                    compiled_subwarp_size == config::warp_size;
         },
-        syn::value_list<int>(), syn::type_list<>(), exec, m, rank, &tmp, m_out,
-        m_out_coo);
+        syn::value_list<int>(), syn::type_list<>(), exec, m, rank, &tmp,
+        &threshold, m_out, m_out_coo);
 }
 
 

@@ -223,16 +223,23 @@ protected:
                                               typename Mtx::index_type>>
     void test_filter(const std::unique_ptr<Mtx> &mtx,
                      gko::remove_complex<value_type> threshold,
-                     const std::unique_ptr<Mtx> &expected)
+                     const std::unique_ptr<Mtx> &expected, bool lower)
     {
         auto res_mtx = Mtx::create(exec, mtx->get_size());
         auto res_mtx_coo = Coo::create(exec, mtx->get_size());
 
-        gko::kernels::reference::par_ilut_factorization::threshold_filter(
-            ref, mtx.get(), threshold, res_mtx.get(), res_mtx_coo.get());
+        std::unique_ptr<Mtx> local_mtx{gko::as<Mtx>(
+            lower ? mtx->clone().release() : mtx->transpose().release())};
+        std::unique_ptr<Mtx> local_expected{
+            gko::as<Mtx>(lower ? expected->clone().release()
+                               : expected->transpose().release())};
 
-        GKO_ASSERT_MTX_EQ_SPARSITY(expected, res_mtx);
-        GKO_ASSERT_MTX_NEAR(expected, res_mtx, 0);
+        gko::kernels::reference::par_ilut_factorization::threshold_filter(
+            ref, local_mtx.get(), threshold, res_mtx.get(), res_mtx_coo.get(),
+            lower);
+
+        GKO_ASSERT_MTX_EQ_SPARSITY(local_expected, res_mtx);
+        GKO_ASSERT_MTX_NEAR(local_expected, res_mtx, 0);
         GKO_ASSERT_MTX_EQ_SPARSITY(res_mtx, res_mtx_coo);
         GKO_ASSERT_MTX_NEAR(res_mtx, res_mtx_coo, 0);
     }
@@ -245,16 +252,26 @@ protected:
     {
         auto res_mtx = Mtx::create(exec, mtx->get_size());
         auto res_mtx_coo = Coo::create(exec, mtx->get_size());
+        auto res_mtx2 = Mtx::create(exec, mtx->get_size());
+        auto res_mtx_coo2 = Coo::create(exec, mtx->get_size());
 
         auto tmp = gko::Array<typename Mtx::value_type>{exec};
+        gko::remove_complex<typename Mtx::value_type> threshold{};
         gko::kernels::reference::par_ilut_factorization::
-            threshold_filter_approx(ref, mtx.get(), rank, tmp, res_mtx.get(),
-                                    res_mtx_coo.get());
+            threshold_filter_approx(ref, mtx.get(), rank, tmp, threshold,
+                                    res_mtx.get(), res_mtx_coo.get());
+        gko::kernels::reference::par_ilut_factorization::threshold_filter(
+            ref, mtx.get(), threshold, res_mtx2.get(), res_mtx_coo2.get(),
+            true);
 
         GKO_ASSERT_MTX_EQ_SPARSITY(expected, res_mtx);
+        GKO_ASSERT_MTX_EQ_SPARSITY(expected, res_mtx2);
         GKO_ASSERT_MTX_NEAR(expected, res_mtx, 0);
+        GKO_ASSERT_MTX_NEAR(expected, res_mtx2, 0);
         GKO_ASSERT_MTX_EQ_SPARSITY(res_mtx, res_mtx_coo);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res_mtx, res_mtx_coo2);
         GKO_ASSERT_MTX_NEAR(res_mtx, res_mtx_coo, 0);
+        GKO_ASSERT_MTX_NEAR(res_mtx, res_mtx_coo2, 0);
     }
 
     std::shared_ptr<const gko::ReferenceExecutor> ref;
@@ -327,33 +344,80 @@ TYPED_TEST(ParIlut, KernelComplexThresholdSelectMax)
 }
 
 
-TYPED_TEST(ParIlut, KernelThresholdFilterNone)
+TYPED_TEST(ParIlut, KernelThresholdFilterNullptrCoo)
 {
-    this->test_filter(this->mtx1, 0.0, this->mtx1);
+    using Csr = typename TestFixture::Csr;
+    using Coo = typename TestFixture::Coo;
+    auto res_mtx = Csr::create(this->exec, this->mtx1->get_size());
+    Coo *null_coo = nullptr;
+
+    gko::kernels::reference::par_ilut_factorization::threshold_filter(
+        this->ref, this->mtx1.get(), 0.0, res_mtx.get(), null_coo, true);
+
+    GKO_ASSERT_MTX_EQ_SPARSITY(this->mtx1, res_mtx);
+    GKO_ASSERT_MTX_NEAR(this->mtx1, res_mtx, 0);
 }
 
 
-TYPED_TEST(ParIlut, KernelThresholdFilterSomeAtThreshold)
+TYPED_TEST(ParIlut, KernelThresholdFilterNoneLower)
 {
-    this->test_filter(this->mtx1, 2.0, this->mtx1_expect_thrm2);
+    this->test_filter(this->mtx1, 0.0, this->mtx1, true);
 }
 
 
-TYPED_TEST(ParIlut, KernelThresholdFilterSomeAboveThreshold)
+TYPED_TEST(ParIlut, KernelThresholdFilterNoneUpper)
 {
-    this->test_filter(this->mtx1, 3.0, this->mtx1_expect_thrm3);
+    this->test_filter(this->mtx1, 0.0, this->mtx1, false);
 }
 
 
-TYPED_TEST(ParIlut, KernelComplexThresholdFilterNone)
+TYPED_TEST(ParIlut, KernelThresholdFilterSomeAtThresholdLower)
 {
-    this->test_filter(this->mtx1_complex, 0.0, this->mtx1_complex);
+    this->test_filter(this->mtx1, 2.0, this->mtx1_expect_thrm2, true);
 }
 
 
-TYPED_TEST(ParIlut, KernelComplexThresholdFilterSomeAtThreshold)
+TYPED_TEST(ParIlut, KernelThresholdFilterSomeAtThresholdUpper)
 {
-    this->test_filter(this->mtx1_complex, 1.01, this->mtx1_expect_complex_thrm);
+    this->test_filter(this->mtx1, 2.0, this->mtx1_expect_thrm2, false);
+}
+
+
+TYPED_TEST(ParIlut, KernelThresholdFilterSomeAboveThresholdLower)
+{
+    this->test_filter(this->mtx1, 3.0, this->mtx1_expect_thrm3, true);
+}
+
+
+TYPED_TEST(ParIlut, KernelThresholdFilterSomeAboveThresholdUpper)
+{
+    this->test_filter(this->mtx1, 3.0, this->mtx1_expect_thrm3, false);
+}
+
+
+TYPED_TEST(ParIlut, KernelComplexThresholdFilterNoneLower)
+{
+    this->test_filter(this->mtx1_complex, 0.0, this->mtx1_complex, true);
+}
+
+
+TYPED_TEST(ParIlut, KernelComplexThresholdFilterNoneUpper)
+{
+    this->test_filter(this->mtx1_complex, 0.0, this->mtx1_complex, false);
+}
+
+
+TYPED_TEST(ParIlut, KernelComplexThresholdFilterSomeAtThresholdLower)
+{
+    this->test_filter(this->mtx1_complex, 1.01, this->mtx1_expect_complex_thrm,
+                      true);
+}
+
+
+TYPED_TEST(ParIlut, KernelComplexThresholdFilterSomeAtThresholdUpper)
+{
+    this->test_filter(this->mtx1_complex, 1.01, this->mtx1_expect_complex_thrm,
+                      false);
 }
 
 
@@ -415,15 +479,18 @@ TYPED_TEST(ParIlut, KernelComputeLU)
     this->mtx_l_system->convert_to(mtx_l_coo.get());
     auto mtx_u_transp = this->mtx_u_system->transpose();
     auto mtx_u_coo = Coo::create(this->exec, this->mtx_system->get_size());
+    this->mtx_u_system->convert_to(mtx_u_coo.get());
     auto mtx_u_csc = gko::as<Csr>(mtx_u_transp.get());
-    mtx_u_csc->convert_to(mtx_u_coo.get());
 
     gko::kernels::reference::par_ilut_factorization::compute_l_u_factors(
         this->ref, this->mtx_system.get(), this->mtx_l_system.get(),
-        mtx_l_coo.get(), mtx_u_csc, mtx_u_coo.get());
+        mtx_l_coo.get(), this->mtx_u_system.get(), mtx_u_coo.get(), mtx_u_csc);
+    std::unique_ptr<Csr> mtx_utt{
+        gko::as<Csr>(mtx_u_csc->transpose().release())};
 
     GKO_ASSERT_MTX_NEAR(this->mtx_l_system, this->mtx_l_it_expect, this->tol);
     GKO_ASSERT_MTX_NEAR(mtx_u_csc, this->mtx_u_it_expect, this->tol);
+    GKO_ASSERT_MTX_NEAR(this->mtx_u_system, mtx_utt, 0);
 }
 
 

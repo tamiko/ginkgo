@@ -106,7 +106,9 @@ __device__ void abstract_filter(const IndexType *__restrict__ old_row_ptrs,
             IndexType warp_prefix_sum) {
             if (keep) {
                 auto new_idx = new_offset + warp_prefix_sum + count;
-                new_row_idxs[new_idx] = row;
+                if (new_row_idxs) {
+                    new_row_idxs[new_idx] = row;
+                }
                 new_col_idxs[new_idx] = old_col_idxs[idx];
                 new_vals[new_idx] = old_vals[idx];
             }
@@ -120,12 +122,13 @@ template <int subwarp_size, typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void threshold_filter_nnz(
     const IndexType *__restrict__ row_ptrs, const ValueType *vals,
     IndexType num_rows, remove_complex<ValueType> threshold,
-    IndexType *__restrict__ nnz)
+    IndexType *__restrict__ nnz, bool lower)
 {
     abstract_filter_nnz<subwarp_size>(
         row_ptrs, num_rows,
         [&](IndexType idx, IndexType row_begin, IndexType row_end) {
-            return abs(vals[idx]) >= threshold || idx == row_end - 1;
+            auto diag_idx = lower ? row_end - 1 : row_begin;
+            return abs(vals[idx]) >= threshold || idx == diag_idx;
         },
         nnz);
 }
@@ -139,12 +142,13 @@ __global__ __launch_bounds__(default_block_size) void threshold_filter(
     remove_complex<ValueType> threshold,
     const IndexType *__restrict__ new_row_ptrs,
     IndexType *__restrict__ new_row_idxs, IndexType *__restrict__ new_col_idxs,
-    ValueType *__restrict__ new_vals)
+    ValueType *__restrict__ new_vals, bool lower)
 {
     abstract_filter<subwarp_size>(
         old_row_ptrs, old_col_idxs, old_vals, num_rows,
         [&](IndexType idx, IndexType row_begin, IndexType row_end) {
-            return abs(old_vals[idx]) >= threshold || idx == row_end - 1;
+            auto diag_idx = lower ? row_end - 1 : row_begin;
+            return abs(old_vals[idx]) >= threshold || idx == diag_idx;
         },
         new_row_ptrs, new_row_idxs, new_col_idxs, new_vals);
 }

@@ -49,9 +49,10 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
     const IndexType *__restrict__ l_row_ptrs,
     const IndexType *__restrict__ l_row_idxs,
     const IndexType *__restrict__ l_col_idxs, ValueType *__restrict__ l_vals,
-    IndexType l_nnz, const IndexType *__restrict__ u_col_ptrs,
-    const IndexType *__restrict__ u_row_idxs,
+    IndexType l_nnz, const IndexType *__restrict__ u_row_idxs,
     const IndexType *__restrict__ u_col_idxs, ValueType *__restrict__ u_vals,
+    const IndexType *__restrict__ ut_col_ptrs,
+    const IndexType *__restrict__ ut_row_idxs, ValueType *__restrict__ ut_vals,
     IndexType u_nnz)
 {
     auto tidx = thread::get_thread_id_flat<IndexType>();
@@ -80,25 +81,30 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
     // find matching column/row indices from L and U
     auto l_row_begin = l_row_ptrs[row];
     auto l_row_size = l_row_ptrs[row + 1] - l_row_begin;
-    auto u_col_begin = u_col_ptrs[col];
-    auto u_col_size = u_col_ptrs[col + 1] - u_col_begin;
+    auto ut_col_begin = ut_col_ptrs[col];
+    auto ut_col_size = ut_col_ptrs[col + 1] - ut_col_begin;
     ValueType sum{};
+    IndexType ut_nz{};
     auto last_entry = min(row, col);
     sequential_merge(l_col_idxs + l_row_begin, l_row_size,
-                     u_row_idxs + u_col_begin, u_col_size,
-                     [&](IndexType l_idx, IndexType l_col, IndexType u_idx,
-                         IndexType u_row, IndexType) {
+                     ut_row_idxs + ut_col_begin, ut_col_size,
+                     [&](IndexType l_idx, IndexType l_col, IndexType ut_idx,
+                         IndexType ut_row, IndexType) {
                          /* this is equivalent to the last_product approach
                           * because the row of L has column index <= row
                           * and the column of U has row index <= col
                           * so the last entry will always be the diagonal */
-                         if (l_col == u_row && l_col < last_entry) {
+                         if (l_col == ut_row && l_col < last_entry) {
                              sum += l_vals[l_idx + l_row_begin] *
-                                    u_vals[u_idx + u_col_begin];
+                                    ut_vals[ut_idx + ut_col_begin];
+                         }
+                         // remember the transposed element
+                         if (ut_row == row) {
+                             ut_nz = ut_idx;
                          }
                      });
     if (lower) {
-        auto to_write = (a_val - sum) / u_vals[u_col_ptrs[col + 1] - 1];
+        auto to_write = (a_val - sum) / ut_vals[ut_col_ptrs[col + 1] - 1];
         if (is_finite(to_write)) {
             l_vals[l_nz] = to_write;
         }
@@ -106,6 +112,7 @@ __global__ __launch_bounds__(default_block_size) void sweep_sequential(
         auto to_write = a_val - sum;
         if (is_finite(to_write)) {
             u_vals[u_nz] = to_write;
+            ut_vals[ut_nz] = to_write;
         }
     }
 }
@@ -119,9 +126,10 @@ __global__ __launch_bounds__(default_block_size) void sweep(
     const IndexType *__restrict__ l_row_ptrs,
     const IndexType *__restrict__ l_row_idxs,
     const IndexType *__restrict__ l_col_idxs, ValueType *__restrict__ l_vals,
-    IndexType l_nnz, const IndexType *__restrict__ u_col_ptrs,
-    const IndexType *__restrict__ u_row_idxs,
+    IndexType l_nnz, const IndexType *__restrict__ u_row_idxs,
     const IndexType *__restrict__ u_col_idxs, ValueType *__restrict__ u_vals,
+    const IndexType *__restrict__ ut_col_ptrs,
+    const IndexType *__restrict__ ut_row_idxs, ValueType *__restrict__ ut_vals,
     IndexType u_nnz)
 {
     auto tidx = thread::get_subwarp_id_flat<subwarp_size, IndexType>();
@@ -151,20 +159,27 @@ __global__ __launch_bounds__(default_block_size) void sweep(
     auto a_val = has_a ? a_vals[a_idx] : zero<ValueType>();
     auto l_row_begin = l_row_ptrs[row];
     auto l_row_size = l_row_ptrs[row + 1] - l_row_begin;
-    auto u_col_begin = u_col_ptrs[col];
-    auto u_col_size = u_col_ptrs[col + 1] - u_col_begin;
+    auto ut_col_begin = ut_col_ptrs[col];
+    auto ut_col_size = ut_col_ptrs[col + 1] - ut_col_begin;
     ValueType sum{};
+    IndexType ut_nz{};
     auto last_entry = min(row, col);
     group_merge<subwarp_size>(
-        l_col_idxs + l_row_begin, l_row_size, u_row_idxs + u_col_begin,
-        u_col_size, subwarp,
-        [&](IndexType l_idx, IndexType l_col, IndexType u_idx, IndexType u_row,
-            IndexType, bool) {
+        l_col_idxs + l_row_begin, l_row_size, ut_row_idxs + ut_col_begin,
+        ut_col_size, subwarp,
+        [&](IndexType l_idx, IndexType l_col, IndexType ut_idx,
+            IndexType ut_row, IndexType, bool) {
             // we don't need to use the `bool valid` because last_entry is
             // already a smaller sentinel value than the one used in group_merge
-            if (l_col == u_row && l_col < last_entry) {
-                sum +=
-                    l_vals[l_idx + l_row_begin] * u_vals[u_idx + u_col_begin];
+            if (l_col == ut_row && l_col < last_entry) {
+                sum += l_vals[l_idx + l_row_begin] *
+                       ut_vals[ut_idx + ut_col_begin];
+            }
+            // remember the transposed element
+            auto found_transp = subwarp.ballot(ut_row == row);
+            if (found_transp) {
+                ut_nz =
+                    subwarp.shfl(ut_idx + ut_col_begin, ffs(found_transp) - 1);
             }
         });
     // accumulate result from all threads
@@ -172,7 +187,7 @@ __global__ __launch_bounds__(default_block_size) void sweep(
 
     if (subwarp.thread_rank() == 0) {
         if (lower) {
-            auto to_write = (a_val - sum) / u_vals[u_col_ptrs[col + 1] - 1];
+            auto to_write = (a_val - sum) / ut_vals[ut_col_ptrs[col + 1] - 1];
             if (is_finite(to_write)) {
                 l_vals[l_nz] = to_write;
             }
@@ -180,6 +195,7 @@ __global__ __launch_bounds__(default_block_size) void sweep(
             auto to_write = a_val - sum;
             if (is_finite(to_write)) {
                 u_vals[u_nz] = to_write;
+                ut_vals[ut_nz] = to_write;
             }
         }
     }

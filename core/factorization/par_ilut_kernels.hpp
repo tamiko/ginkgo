@@ -58,14 +58,14 @@ namespace kernels {
                         const matrix::Csr<ValueType, IndexType> *u,      \
                         matrix::Csr<ValueType, IndexType> *l_new,        \
                         matrix::Csr<ValueType, IndexType> *u_new)
-#define GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS(ValueType, IndexType) \
-    void compute_l_u_factors(                                         \
-        std::shared_ptr<const DefaultExecutor> exec,                  \
-        const matrix::Csr<ValueType, IndexType> *a,                   \
-        matrix::Csr<ValueType, IndexType> *l,                         \
-        const matrix::Coo<ValueType, IndexType> *l_coo,               \
-        matrix::Csr<ValueType, IndexType> *u_csc,                     \
-        const matrix::Coo<ValueType, IndexType> *u_transp_coo)
+#define GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS_KERNEL(ValueType, IndexType) \
+    void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,    \
+                             const matrix::Csr<ValueType, IndexType> *a,     \
+                             matrix::Csr<ValueType, IndexType> *l,           \
+                             const matrix::Coo<ValueType, IndexType> *l_coo, \
+                             matrix::Csr<ValueType, IndexType> *u,           \
+                             const matrix::Coo<ValueType, IndexType> *u_coo, \
+                             matrix::Csr<ValueType, IndexType> *u_csc)
 #define GKO_DECLARE_PAR_ILUT_THRESHOLD_SELECT_KERNEL(ValueType, IndexType) \
     void threshold_select(std::shared_ptr<const DefaultExecutor> exec,     \
                           const matrix::Csr<ValueType, IndexType> *m,      \
@@ -77,25 +77,27 @@ namespace kernels {
                           const matrix::Csr<ValueType, IndexType> *m,      \
                           remove_complex<ValueType> threshold,             \
                           matrix::Csr<ValueType, IndexType> *m_out,        \
-                          matrix::Coo<ValueType, IndexType> *m_out_coo)
+                          matrix::Coo<ValueType, IndexType> *m_out_coo,    \
+                          bool lower)
 #define GKO_DECLARE_PAR_ILUT_THRESHOLD_FILTER_APPROX_KERNEL(ValueType,        \
                                                             IndexType)        \
     void threshold_filter_approx(std::shared_ptr<const DefaultExecutor> exec, \
                                  const matrix::Csr<ValueType, IndexType> *m,  \
                                  IndexType rank, Array<ValueType> &tmp,       \
+                                 remove_complex<ValueType> &threshold,        \
                                  matrix::Csr<ValueType, IndexType> *m_out,    \
                                  matrix::Coo<ValueType, IndexType> *m_out_coo)
 
-#define GKO_DECLARE_ALL_AS_TEMPLATES                                    \
-    template <typename ValueType, typename IndexType>                   \
-    GKO_DECLARE_PAR_ILUT_ADD_CANDIDATES_KERNEL(ValueType, IndexType);   \
-    template <typename ValueType, typename IndexType>                   \
-    GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS(ValueType, IndexType);      \
-    template <typename ValueType, typename IndexType>                   \
-    GKO_DECLARE_PAR_ILUT_THRESHOLD_SELECT_KERNEL(ValueType, IndexType); \
-    template <typename ValueType, typename IndexType>                   \
-    GKO_DECLARE_PAR_ILUT_THRESHOLD_FILTER_KERNEL(ValueType, IndexType); \
-    template <typename ValueType, typename IndexType>                   \
+#define GKO_DECLARE_ALL_AS_TEMPLATES                                      \
+    template <typename ValueType, typename IndexType>                     \
+    GKO_DECLARE_PAR_ILUT_ADD_CANDIDATES_KERNEL(ValueType, IndexType);     \
+    template <typename ValueType, typename IndexType>                     \
+    GKO_DECLARE_PAR_ILUT_COMPUTE_LU_FACTORS_KERNEL(ValueType, IndexType); \
+    template <typename ValueType, typename IndexType>                     \
+    GKO_DECLARE_PAR_ILUT_THRESHOLD_SELECT_KERNEL(ValueType, IndexType);   \
+    template <typename ValueType, typename IndexType>                     \
+    GKO_DECLARE_PAR_ILUT_THRESHOLD_FILTER_KERNEL(ValueType, IndexType);   \
+    template <typename ValueType, typename IndexType>                     \
     GKO_DECLARE_PAR_ILUT_THRESHOLD_FILTER_APPROX_KERNEL(ValueType, IndexType)
 
 

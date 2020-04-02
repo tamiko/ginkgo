@@ -114,6 +114,7 @@ __global__ __launch_bounds__(default_block_size) void count_buckets(
         }
         // increment the bucket counter and store the bucket index
         uint32 bucket = tree_idx - searchtree_inner_size;
+        // post-condition: sample[bucket] <= el < sample[bucket + 1]
         atomic_add<IndexType>(sh_counter + bucket, 1);
         oracles[i] = bucket;
     }

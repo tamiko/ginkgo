@@ -125,8 +125,8 @@ class ParIlutState {
     std::unique_ptr<CsrMatrix> u_new_csc;
     // lower factor L currently being updated with asynchronous iterations
     std::unique_ptr<CooMatrix> l_coo;
-    // transposed upper factor U currently being updated
-    std::unique_ptr<CooMatrix> u_transp_coo;
+    // upper factor U currently being updated
+    std::unique_ptr<CooMatrix> u_coo;
     // temporary array for threshold selection
     Array<ValueType> selection_tmp;
     // temporary array for threshold selection
@@ -163,7 +163,7 @@ class ParIlutState {
         u_new = CsrMatrix::create(exec, mtx_size);
         u_new_csc = CsrMatrix::create(exec, mtx_size);
         l_coo = CooMatrix::create(exec, mtx_size);
-        u_transp_coo = CooMatrix::create(exec, mtx_size);
+        u_coo = CooMatrix::create(exec, mtx_size);
         exec->run(make_csr_transpose(u.get(), u_csc.get()));
     }
 
@@ -273,12 +273,12 @@ void ParIlutState<ValueType, IndexType>::iterate()
     exec->run(make_add_candidates(lu.get(), system_matrix, l.get(), u.get(),
                                   l_new.get(), u_new.get()));
 
-    // update u_new_csc, l_coo, u_transp_coo sizes and pointers
+    // update u_new_csc, l_coo, u_coo sizes and pointers
     {
         auto l_nnz = l_new->get_num_stored_elements();
         auto u_nnz = u_new->get_num_stored_elements();
         CooBuilder l_builder{l_coo.get()};
-        CooBuilder u_builder{u_transp_coo.get()};
+        CooBuilder u_builder{u_coo.get()};
         CsrBuilder u_csc_builder{u_new_csc.get()};
         // resize arrays that will be filled
         l_builder.get_row_idx_array().resize_and_reset(l_nnz);
@@ -289,22 +289,22 @@ void ParIlutState<ValueType, IndexType>::iterate()
         l_builder.get_col_idx_array().make_view(exec, l_nnz,
                                                 l_new->get_col_idxs());
         u_builder.get_col_idx_array().make_view(exec, u_nnz,
-                                                u_new_csc->get_col_idxs());
+                                                u_new->get_col_idxs());
         l_builder.get_value_array().make_view(exec, l_nnz, l_new->get_values());
-        u_builder.get_value_array().make_view(exec, u_nnz,
-                                              u_new_csc->get_values());
+        u_builder.get_value_array().make_view(exec, u_nnz, u_new->get_values());
     }
 
     // convert u_new into csc format
     exec->run(make_csr_transpose(u_new.get(), u_new_csc.get()));
 
-    // convert l_new and u_new_csc into COO format
+    // convert l_new and u_new into COO format
     exec->run(make_convert_to_coo(l_new.get(), l_coo.get()));
-    exec->run(make_convert_to_coo(u_new_csc.get(), u_transp_coo.get()));
+    exec->run(make_convert_to_coo(u_new.get(), u_coo.get()));
 
     // execute asynchronous iteration
     exec->run(make_compute_l_u_factors(system_matrix, l_new.get(), l_coo.get(),
-                                       u_new_csc.get(), u_transp_coo.get()));
+                                       u_new.get(), u_coo.get(),
+                                       u_new_csc.get()));
 
     // determine ranks for selection/filtering
     IndexType l_nnz = l_new->get_num_stored_elements();
@@ -312,43 +312,39 @@ void ParIlutState<ValueType, IndexType>::iterate()
     // make sure that the rank is in [0, *_nnz)
     auto l_filter_rank = std::max<IndexType>(0, l_nnz - l_nnz_limit - 1);
     auto u_filter_rank = std::max<IndexType>(0, u_nnz - u_nnz_limit - 1);
+    remove_complex<ValueType> l_threshold{};
+    remove_complex<ValueType> u_threshold{};
+    CooMatrix *null_coo = nullptr;
     if (use_approx_select) {
-        // remove approximately smallest candidates
-        exec->run(make_threshold_filter_approx(
-            l_new.get(), l_filter_rank, selection_tmp, l.get(), l_coo.get()));
+        // remove approximately smallest candidates from L' and U'^T
+        exec->run(make_threshold_filter_approx(l_new.get(), l_filter_rank,
+                                               selection_tmp, l_threshold,
+                                               l.get(), l_coo.get()));
         exec->run(make_threshold_filter_approx(u_new_csc.get(), u_filter_rank,
-                                               selection_tmp, u_csc.get(),
-                                               u_transp_coo.get()));
+                                               selection_tmp, u_threshold,
+                                               u_csc.get(), null_coo));
     } else {
         // select threshold to remove smallest candidates
-        remove_complex<ValueType> l_threshold{};
         exec->run(make_threshold_select(l_new.get(), l_filter_rank,
                                         selection_tmp, selection_tmp2,
                                         l_threshold));
-        remove_complex<ValueType> u_threshold{};
         exec->run(make_threshold_select(u_new_csc.get(), u_filter_rank,
                                         selection_tmp, selection_tmp2,
                                         u_threshold));
 
-        // remove smallest candidates
+        // remove smallest candidates from L' and U'^T
         exec->run(make_threshold_filter(l_new.get(), l_threshold, l.get(),
-                                        l_coo.get()));
+                                        l_coo.get(), true));
         exec->run(make_threshold_filter(u_new_csc.get(), u_threshold,
-                                        u_csc.get(), u_transp_coo.get()));
+                                        u_csc.get(), null_coo, true));
     }
+    // remove smallest candidates from U'
+    exec->run(make_threshold_filter(u_new.get(), u_threshold, u.get(),
+                                    u_coo.get(), false));
 
     // execute asynchronous iteration
     exec->run(make_compute_l_u_factors(system_matrix, l.get(), l_coo.get(),
-                                       u_csc.get(), u_transp_coo.get()));
-
-    // convert u_csc back into CSR
-    {
-        auto u_nnz = u_csc->get_num_stored_elements();
-        CsrBuilder u_builder{u.get()};
-        u_builder.get_col_idx_array().resize_and_reset(u_nnz);
-        u_builder.get_value_array().resize_and_reset(u_nnz);
-    }
-    exec->run(make_csr_transpose(u_csc.get(), u.get()));
+                                       u.get(), u_coo.get(), u_csc.get()));
 }
 
 

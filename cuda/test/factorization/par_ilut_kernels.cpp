@@ -119,6 +119,7 @@ protected:
         dmtx_square->copy_from(mtx_square.get());
         dmtx_ani = Csr::create(cuda);
         dmtx_l_ani = Csr::create(cuda);
+        dmtx_u_ani = Csr::create(cuda);
         dmtx_ut_ani = Csr::create(cuda);
         dmtx_l = Csr::create(cuda);
         dmtx_l->copy_from(mtx_l.get());
@@ -145,7 +146,7 @@ protected:
 
         {
             mtx_l_ani = Csr::create(ref, mtx_ani->get_size());
-            auto mtx_u_ani = Csr::create(ref, mtx_ani->get_size());
+            mtx_u_ani = Csr::create(ref, mtx_ani->get_size());
             gko::matrix::CsrBuilder<value_type, index_type> l_builder(
                 mtx_l_ani.get());
             gko::matrix::CsrBuilder<value_type, index_type> u_builder(
@@ -171,6 +172,7 @@ protected:
         }
         dmtx_ani->copy_from(mtx_ani.get());
         dmtx_l_ani->copy_from(mtx_l_ani.get());
+        dmtx_u_ani->copy_from(mtx_u_ani.get());
         dmtx_ut_ani->copy_from(mtx_ut_ani.get());
     }
 
@@ -201,31 +203,38 @@ protected:
               typename Coo = gko::matrix::Coo<typename Mtx::value_type,
                                               typename Mtx::index_type>>
     void test_filter(const std::unique_ptr<Mtx> &mtx,
-                     const std::unique_ptr<Mtx> &dmtx, value_type threshold)
+                     const std::unique_ptr<Mtx> &dmtx, value_type threshold,
+                     bool lower)
     {
         auto res = Mtx::create(ref, mtx_size);
         auto dres = Mtx::create(cuda, mtx_size);
         auto res_coo = Coo::create(ref, mtx_size);
         auto dres_coo = Coo::create(cuda, mtx_size);
+        auto local_mtx = std::unique_ptr<Mtx>{gko::as<Mtx>(
+            lower ? mtx->clone().release() : mtx->transpose().release())};
+        auto local_dmtx = std::unique_ptr<Mtx>{gko::as<Mtx>(
+            lower ? dmtx->clone().release() : dmtx->transpose().release())};
 
         gko::kernels::reference::par_ilut_factorization::threshold_filter(
-            ref, mtx.get(), threshold, res.get(), res_coo.get());
+            ref, local_mtx.get(), threshold, res.get(), res_coo.get(), lower);
         gko::kernels::cuda::par_ilut_factorization::threshold_filter(
-            cuda, dmtx.get(), threshold, dres.get(), dres_coo.get());
+            cuda, local_dmtx.get(), threshold, dres.get(), dres_coo.get(),
+            lower);
 
-        GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
         GKO_ASSERT_MTX_NEAR(res, dres, 0);
-        GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
         GKO_ASSERT_MTX_NEAR(res, res_coo, 0);
-        GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
         GKO_ASSERT_MTX_NEAR(dres, dres_coo, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
     }
 
     template <typename Mtx,
               typename Coo = gko::matrix::Coo<typename Mtx::value_type,
                                               typename Mtx::index_type>>
     void test_filter_approx(const std::unique_ptr<Mtx> &mtx,
-                            const std::unique_ptr<Mtx> &dmtx, index_type rank)
+                            const std::unique_ptr<Mtx> &dmtx, index_type rank,
+                            value_type tolerance = 0.0)
     {
         auto res = Mtx::create(ref, mtx_size);
         auto dres = Mtx::create(cuda, mtx_size);
@@ -235,19 +244,23 @@ protected:
 
         gko::Array<ValueType> tmp(ref);
         gko::Array<ValueType> dtmp(cuda);
+        gko::remove_complex<ValueType> threshold{};
+        gko::remove_complex<ValueType> dthreshold{};
 
         gko::kernels::reference::par_ilut_factorization::
-            threshold_filter_approx(ref, mtx.get(), rank, tmp, res.get(),
-                                    res_coo.get());
+            threshold_filter_approx(ref, mtx.get(), rank, tmp, threshold,
+                                    res.get(), res_coo.get());
         gko::kernels::cuda::par_ilut_factorization::threshold_filter_approx(
-            cuda, dmtx.get(), rank, dtmp, dres.get(), dres_coo.get());
+            cuda, dmtx.get(), rank, dtmp, dthreshold, dres.get(),
+            dres_coo.get());
 
-        GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
         GKO_ASSERT_MTX_NEAR(res, dres, 0);
-        GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
         GKO_ASSERT_MTX_NEAR(res, res_coo, 0);
-        GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
         GKO_ASSERT_MTX_NEAR(dres, dres_coo, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
+        ASSERT_NEAR(threshold, dthreshold, tolerance);
     }
 
     std::shared_ptr<gko::ReferenceExecutor> ref;
@@ -261,6 +274,7 @@ protected:
     std::unique_ptr<Csr> mtx_square;
     std::unique_ptr<Csr> mtx_ani;
     std::unique_ptr<Csr> mtx_l_ani;
+    std::unique_ptr<Csr> mtx_u_ani;
     std::unique_ptr<Csr> mtx_ut_ani;
     std::unique_ptr<Csr> mtx_l;
     std::unique_ptr<Csr> mtx_l2;
@@ -273,6 +287,7 @@ protected:
     std::unique_ptr<Csr> dmtx_square;
     std::unique_ptr<Csr> dmtx_ani;
     std::unique_ptr<Csr> dmtx_l_ani;
+    std::unique_ptr<Csr> dmtx_u_ani;
     std::unique_ptr<Csr> dmtx_ut_ani;
     std::unique_ptr<Csr> dmtx_l;
     std::unique_ptr<Csr> dmtx_l2;
@@ -322,37 +337,73 @@ TEST_F(ParIlut, KernelComplexThresholdSelectMaxLowerIsEquivalentToRef)
 
 TEST_F(ParIlut, KernelThresholdFilterLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l, dmtx_l, 0.5);
+    test_filter(mtx_l, dmtx_l, 0.5, true);
+}
+
+
+TEST_F(ParIlut, KernelThresholdFilterUpperIsEquivalentToRef)
+{
+    test_filter(mtx_l, dmtx_l, 0.5, false);
 }
 
 
 TEST_F(ParIlut, KernelThresholdFilterNoneLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l, dmtx_l, 0);
+    test_filter(mtx_l, dmtx_l, 0, true);
+}
+
+
+TEST_F(ParIlut, KernelThresholdFilterNoneUpperIsEquivalentToRef)
+{
+    test_filter(mtx_l, dmtx_l, 0, false);
 }
 
 
 TEST_F(ParIlut, KernelThresholdFilterAllLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l, dmtx_l, 1e6);
+    test_filter(mtx_l, dmtx_l, 1e6, true);
+}
+
+
+TEST_F(ParIlut, KernelThresholdFilterAllUpperIsEquivalentToRef)
+{
+    test_filter(mtx_l, dmtx_l, 1e6, false);
 }
 
 
 TEST_F(ParIlut, KernelComplexThresholdFilterLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l_complex, dmtx_l_complex, 0.5);
+    test_filter(mtx_l_complex, dmtx_l_complex, 0.5, true);
+}
+
+
+TEST_F(ParIlut, KernelComplexThresholdFilterUpperIsEquivalentToRef)
+{
+    test_filter(mtx_l_complex, dmtx_l_complex, 0.5, false);
 }
 
 
 TEST_F(ParIlut, KernelComplexThresholdFilterNoneLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l_complex, dmtx_l_complex, 0);
+    test_filter(mtx_l_complex, dmtx_l_complex, 0, true);
+}
+
+
+TEST_F(ParIlut, KernelComplexThresholdFilterNoneUpperIsEquivalentToRef)
+{
+    test_filter(mtx_l_complex, dmtx_l_complex, 0, false);
 }
 
 
 TEST_F(ParIlut, KernelComplexThresholdFilterAllLowerIsEquivalentToRef)
 {
-    test_filter(mtx_l_complex, dmtx_l_complex, 1e6);
+    test_filter(mtx_l_complex, dmtx_l_complex, 1e6, true);
+}
+
+
+TEST_F(ParIlut, KernelComplexThresholdFilterAllUppererIsEquivalentToRef)
+{
+    test_filter(mtx_l_complex, dmtx_l_complex, 1e6, false);
 }
 
 
@@ -377,20 +428,22 @@ TEST_F(ParIlut, KernelThresholdFilterApproxAllLowerIsEquivalentToRef)
 TEST_F(ParIlut, KernelComplexThresholdFilterApproxLowerIsEquivalentToRef)
 {
     test_filter_approx(mtx_l_complex, dmtx_l_complex,
-                       mtx_l_complex->get_num_stored_elements() / 2);
+                       mtx_l_complex->get_num_stored_elements() / 2,
+                       r<value_type>::value);
 }
 
 
 TEST_F(ParIlut, KernelComplexThresholdFilterApproxNoneLowerIsEquivalentToRef)
 {
-    test_filter_approx(mtx_l_complex, dmtx_l_complex, 0);
+    test_filter_approx(mtx_l_complex, dmtx_l_complex, 0, r<value_type>::value);
 }
 
 
 TEST_F(ParIlut, KernelComplexThresholdFilterApproxAllLowerIsEquivalentToRef)
 {
     test_filter_approx(mtx_l_complex, dmtx_l_complex,
-                       mtx_l_complex->get_num_stored_elements() - 1);
+                       mtx_l_complex->get_num_stored_elements() - 1,
+                       r<value_type>::value);
 }
 
 
@@ -424,25 +477,28 @@ TEST_F(ParIlut, KernelComputeLUIsEquivalentToRef)
 {
     auto square_size = mtx_ani->get_size();
     auto mtx_l_coo = Coo::create(ref, square_size);
-    auto mtx_ut_coo = Coo::create(ref, square_size);
+    auto mtx_u_coo = Coo::create(ref, square_size);
     mtx_l_ani->convert_to(mtx_l_coo.get());
-    mtx_ut_ani->convert_to(mtx_ut_coo.get());
+    mtx_u_ani->convert_to(mtx_u_coo.get());
     auto dmtx_l_coo = Coo::create(cuda, square_size);
-    auto dmtx_ut_coo = Coo::create(cuda, square_size);
+    auto dmtx_u_coo = Coo::create(cuda, square_size);
     dmtx_l_coo->copy_from(mtx_l_coo.get());
-    dmtx_ut_coo->copy_from(mtx_ut_coo.get());
+    dmtx_u_coo->copy_from(mtx_u_coo.get());
 
     gko::kernels::reference::par_ilut_factorization::compute_l_u_factors(
-        ref, mtx_ani.get(), mtx_l_ani.get(), mtx_l_coo.get(), mtx_ut_ani.get(),
-        mtx_ut_coo.get());
+        ref, mtx_ani.get(), mtx_l_ani.get(), mtx_l_coo.get(), mtx_u_ani.get(),
+        mtx_u_coo.get(), mtx_ut_ani.get());
     for (int i = 0; i < 20; ++i) {
         gko::kernels::cuda::par_ilut_factorization::compute_l_u_factors(
             cuda, dmtx_ani.get(), dmtx_l_ani.get(), dmtx_l_coo.get(),
-            dmtx_ut_ani.get(), dmtx_ut_coo.get());
+            dmtx_u_ani.get(), dmtx_u_coo.get(), dmtx_ut_ani.get());
     }
+    std::unique_ptr<Csr> dmtx_utt_ani{
+        gko::as<Csr>(dmtx_ut_ani->transpose().release())};
 
     GKO_ASSERT_MTX_NEAR(mtx_l_ani, dmtx_l_ani, 1e-2);
-    GKO_ASSERT_MTX_NEAR(mtx_ut_ani, dmtx_ut_ani, 1e-2);
+    GKO_ASSERT_MTX_NEAR(mtx_u_ani, dmtx_u_ani, 1e-2);
+    GKO_ASSERT_MTX_NEAR(dmtx_u_ani, dmtx_utt_ani, 0);
 }
 
 
