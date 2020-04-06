@@ -62,6 +62,12 @@ namespace reference {
 namespace par_ilut_factorization {
 
 
+/**
+ * @internal
+ *
+ * Selects the `rank`th smallest element (0-based, magnitude-wise)
+ * from the values of `m`. It uses two temporary arrays.
+ */
 template <typename ValueType, typename IndexType>
 void threshold_select(std::shared_ptr<const DefaultExecutor> exec,
                       const matrix::Csr<ValueType, IndexType> *m,
@@ -147,6 +153,11 @@ void abstract_filter(std::shared_ptr<const DefaultExecutor> exec,
 }
 
 
+/**
+ * @internal
+ *
+ * Removes all elements below the given threshold from a matrix.
+ */
 template <typename ValueType, typename IndexType>
 void threshold_filter(std::shared_ptr<const DefaultExecutor> exec,
                       const matrix::Csr<ValueType, IndexType> *a,
@@ -172,6 +183,12 @@ constexpr auto oversampling_factor = 4;
 constexpr auto sample_size = bucket_count * oversampling_factor;
 
 
+/**
+ * @internal
+ *
+ * Approximately selects the `rank`th smallest element as a threshold
+ * and removes all elements below this threshold from the input matrix.
+ */
 template <typename ValueType, typename IndexType>
 void threshold_filter_approx(std::shared_ptr<const DefaultExecutor> exec,
                              const matrix::Csr<ValueType, IndexType> *m,
@@ -234,6 +251,11 @@ GKO_INSTANTIATE_FOR_EACH_VALUE_AND_INDEX_TYPE(
     GKO_DECLARE_PAR_ILUT_THRESHOLD_FILTER_APPROX_KERNEL);
 
 
+/**
+ * @internal
+ *
+ * Computes a ParILUT sweep on the input matrices.
+ */
 template <typename ValueType, typename IndexType>
 void compute_l_u_factors(std::shared_ptr<const DefaultExecutor> exec,
                          const matrix::Csr<ValueType, IndexType> *a,
@@ -367,6 +389,13 @@ void abstract_spgeam(const matrix::Csr<ValueType, IndexType> *a,
 }
 
 
+/**
+ * @internal
+ *
+ * Adds new entries from the sparsity pattern of A - L * U
+ * to L and U, where new values are chosen based on the residual
+ * value divided by the corresponding diagonal entry.
+ */
 template <typename ValueType, typename IndexType>
 void add_candidates(std::shared_ptr<const DefaultExecutor> exec,
                     const matrix::Csr<ValueType, IndexType> *lu,

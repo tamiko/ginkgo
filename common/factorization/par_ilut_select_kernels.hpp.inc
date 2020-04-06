@@ -47,6 +47,12 @@ constexpr auto basecase_block_size = basecase_size / basecase_local_size;
 
 
 // must be launched with one thread block and block size == searchtree_width
+/**
+ * @internal
+ *
+ * Samples `searchtree_width - 1` uniformly distributed elements
+ * and stores them in a binary search tree as splitters.
+ */
 template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(searchtree_width) void build_searchtree(
     const ValueType *__restrict__ input, IndexType size,
@@ -79,6 +85,13 @@ __global__ __launch_bounds__(searchtree_width) void build_searchtree(
 
 
 // must be launched with default_block_size >= searchtree_width
+/**
+ * @internal
+ *
+ * Computes the number of elements in each of the buckets defined
+ * by the splitter search tree. Stores the thread-block local
+ * results packed by bucket idx.
+ */
 template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void count_buckets(
     const ValueType *__restrict__ input, IndexType size,
@@ -128,6 +141,13 @@ __global__ __launch_bounds__(default_block_size) void count_buckets(
 
 
 // must be launched with default_block_size threads per block
+/**
+ * @internal
+ *
+ * Simultaneously computes a prefix and total sum of the block-local counts for
+ * each bucket. The results are then used as base offsets for the following
+ * filter step.
+ */
 template <typename IndexType>
 __global__ __launch_bounds__(default_block_size) void block_prefix_sum(
     IndexType *__restrict__ counters, IndexType *__restrict__ totals,
@@ -200,6 +220,11 @@ __global__ __launch_bounds__(default_block_size) void block_prefix_sum(
 
 
 // must be launched with default_block_size >= searchtree_width
+/**
+ * @internal
+ *
+ * This copies all elements from a single bucket of the input to the output.
+ */
 template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(default_block_size) void filter_bucket(
     const ValueType *__restrict__ input, IndexType size, unsigned char bucket,
@@ -231,6 +256,11 @@ __global__ __launch_bounds__(default_block_size) void filter_bucket(
 }
 
 
+/**
+ * @internal
+ *
+ * Selects the `rank`th smallest element from a small array by sorting it.
+ */
 template <typename ValueType, typename IndexType>
 __global__ __launch_bounds__(basecase_block_size) void basecase_select(
     const ValueType *__restrict__ input, IndexType size, IndexType rank,
@@ -250,6 +280,13 @@ __global__ __launch_bounds__(basecase_block_size) void basecase_select(
 }
 
 
+/**
+ * @internal
+ *
+ * Finds the bucket that contains the element with the given rank
+ * and stores it and the bucket's base rank and size in the place of the prefix
+ * sum.
+ */
 template <typename IndexType>
 __global__ __launch_bounds__(config::warp_size) void find_bucket(
     IndexType *prefix_sum, IndexType rank)
