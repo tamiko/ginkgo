@@ -50,7 +50,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ginkgo/core/matrix/dense.hpp>
 
 
-#include "core/factorization/par_ilu_kernels.hpp"
+#include "core/factorization/factorization_kernels.hpp"
 #include "core/matrix/csr_builder.hpp"
 #include "core/matrix/csr_kernels.hpp"
 #include "core/test/utils.hpp"
@@ -151,10 +151,9 @@ protected:
                 mtx_l_ani.get());
             gko::matrix::CsrBuilder<value_type, index_type> u_builder(
                 mtx_u_ani.get());
-            gko::kernels::reference::par_ilu_factorization::
-                initialize_row_ptrs_l_u(ref, mtx_ani.get(),
-                                        mtx_l_ani->get_row_ptrs(),
-                                        mtx_u_ani->get_row_ptrs());
+            gko::kernels::reference::factorization::initialize_row_ptrs_l_u(
+                ref, mtx_ani.get(), mtx_l_ani->get_row_ptrs(),
+                mtx_u_ani->get_row_ptrs());
             auto l_nnz =
                 mtx_l_ani->get_const_row_ptrs()[mtx_ani->get_size()[0]];
             auto u_nnz =
@@ -163,7 +162,7 @@ protected:
             l_builder.get_value_array().resize_and_reset(l_nnz);
             u_builder.get_col_idx_array().resize_and_reset(u_nnz);
             u_builder.get_value_array().resize_and_reset(u_nnz);
-            gko::kernels::reference::par_ilu_factorization::initialize_l_u(
+            gko::kernels::reference::factorization::initialize_l_u(
                 ref, mtx_ani.get(), mtx_l_ani.get(), mtx_u_ani.get());
             mtx_ut_ani = Csr::create(ref, mtx_ani->get_size(),
                                      mtx_u_ani->get_num_stored_elements());
@@ -212,84 +211,87 @@ protected:
         auto dres_coo = Coo::create(cuda, mtx_size);
         auto local_mtx = gko::as<Mtx>(lower ? mtx->clone() : mtx->transpose());
         auto local_dmtx =
-            gko::as<Mtx>(lower ? dmtx->clone() : dmtx->transpose())
-    };
+            gko::as<Mtx>(lower ? dmtx->clone() : dmtx->transpose());
 
-    gko::kernels::reference::par_ilut_factorization::threshold_filter(
-        ref, local_mtx.get(), threshold, res.get(), res_coo.get(), lower);
-    gko::kernels::cuda::par_ilut_factorization::threshold_filter(
-        cuda, local_dmtx.get(), threshold, dres.get(), dres_coo.get(), lower);
+        gko::kernels::reference::par_ilut_factorization::threshold_filter(
+            ref, local_mtx.get(), threshold, res.get(), res_coo.get(), lower);
+        gko::kernels::cuda::par_ilut_factorization::threshold_filter(
+            cuda, local_dmtx.get(), threshold, dres.get(), dres_coo.get(),
+            lower);
 
-    GKO_ASSERT_MTX_NEAR(res, dres, 0);
-    GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
-    GKO_ASSERT_MTX_NEAR(res, res_coo, 0);
-    GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
-    GKO_ASSERT_MTX_NEAR(dres, dres_coo, 0);
-    GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
-}
+        GKO_ASSERT_MTX_NEAR(res, dres, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
+        GKO_ASSERT_MTX_NEAR(res, res_coo, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
+        GKO_ASSERT_MTX_NEAR(dres, dres_coo, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
+    }
 
-template <typename Mtx, typename Coo = gko::matrix::Coo<
-                            typename Mtx::value_type, typename Mtx::index_type>>
-void test_filter_approx(const std::unique_ptr<Mtx> &mtx,
-                        const std::unique_ptr<Mtx> &dmtx, index_type rank,
-                        value_type tolerance = 0.0)
-{
-    auto res = Mtx::create(ref, mtx_size);
-    auto dres = Mtx::create(cuda, mtx_size);
-    auto res_coo = Coo::create(ref, mtx_size);
-    auto dres_coo = Coo::create(cuda, mtx_size);
-    using ValueType = typename Mtx::value_type;
+    template <typename Mtx,
+              typename Coo = gko::matrix::Coo<typename Mtx::value_type,
+                                              typename Mtx::index_type>>
+    void test_filter_approx(const std::unique_ptr<Mtx> &mtx,
+                            const std::unique_ptr<Mtx> &dmtx, index_type rank,
+                            value_type tolerance = 0.0)
+    {
+        auto res = Mtx::create(ref, mtx_size);
+        auto dres = Mtx::create(cuda, mtx_size);
+        auto res_coo = Coo::create(ref, mtx_size);
+        auto dres_coo = Coo::create(cuda, mtx_size);
+        using ValueType = typename Mtx::value_type;
 
-    gko::Array<ValueType> tmp(ref);
-    gko::Array<ValueType> dtmp(cuda);
-    gko::remove_complex<ValueType> threshold{};
-    gko::remove_complex<ValueType> dthreshold{};
+        gko::Array<ValueType> tmp(ref);
+        gko::Array<ValueType> dtmp(cuda);
+        gko::remove_complex<ValueType> threshold{};
+        gko::remove_complex<ValueType> dthreshold{};
 
-    gko::kernels::reference::par_ilut_factorization::threshold_filter_approx(
-        ref, mtx.get(), rank, tmp, threshold, res.get(), res_coo.get());
-    gko::kernels::cuda::par_ilut_factorization::threshold_filter_approx(
-        cuda, dmtx.get(), rank, dtmp, dthreshold, dres.get(), dres_coo.get());
+        gko::kernels::reference::par_ilut_factorization::
+            threshold_filter_approx(ref, mtx.get(), rank, tmp, threshold,
+                                    res.get(), res_coo.get());
+        gko::kernels::cuda::par_ilut_factorization::threshold_filter_approx(
+            cuda, dmtx.get(), rank, dtmp, dthreshold, dres.get(),
+            dres_coo.get());
 
-    GKO_ASSERT_MTX_NEAR(res, dres, 0);
-    GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
-    GKO_ASSERT_MTX_NEAR(res, res_coo, 0);
-    GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
-    GKO_ASSERT_MTX_NEAR(dres, dres_coo, 0);
-    GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
-    ASSERT_NEAR(threshold, dthreshold, tolerance);
-}
+        GKO_ASSERT_MTX_NEAR(res, dres, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, dres);
+        GKO_ASSERT_MTX_NEAR(res, res_coo, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(res, res_coo);
+        GKO_ASSERT_MTX_NEAR(dres, dres_coo, 0);
+        GKO_ASSERT_MTX_EQ_SPARSITY(dres, dres_coo);
+        ASSERT_NEAR(threshold, dthreshold, tolerance);
+    }
 
-std::shared_ptr<gko::ReferenceExecutor> ref;
-std::shared_ptr<gko::CudaExecutor> cuda;
+    std::shared_ptr<gko::ReferenceExecutor> ref;
+    std::shared_ptr<gko::CudaExecutor> cuda;
 
-const gko::dim<2> mtx_size;
-std::default_random_engine rand_engine;
+    const gko::dim<2> mtx_size;
+    std::default_random_engine rand_engine;
 
-std::unique_ptr<Csr> mtx1;
-std::unique_ptr<Csr> mtx2;
-std::unique_ptr<Csr> mtx_square;
-std::unique_ptr<Csr> mtx_ani;
-std::unique_ptr<Csr> mtx_l_ani;
-std::unique_ptr<Csr> mtx_u_ani;
-std::unique_ptr<Csr> mtx_ut_ani;
-std::unique_ptr<Csr> mtx_l;
-std::unique_ptr<Csr> mtx_l2;
-std::unique_ptr<ComplexCsr> mtx_l_complex;
-std::unique_ptr<Csr> mtx_u;
-std::unique_ptr<ComplexCsr> mtx_u_complex;
+    std::unique_ptr<Csr> mtx1;
+    std::unique_ptr<Csr> mtx2;
+    std::unique_ptr<Csr> mtx_square;
+    std::unique_ptr<Csr> mtx_ani;
+    std::unique_ptr<Csr> mtx_l_ani;
+    std::unique_ptr<Csr> mtx_u_ani;
+    std::unique_ptr<Csr> mtx_ut_ani;
+    std::unique_ptr<Csr> mtx_l;
+    std::unique_ptr<Csr> mtx_l2;
+    std::unique_ptr<ComplexCsr> mtx_l_complex;
+    std::unique_ptr<Csr> mtx_u;
+    std::unique_ptr<ComplexCsr> mtx_u_complex;
 
-std::unique_ptr<Csr> dmtx1;
-std::unique_ptr<Csr> dmtx2;
-std::unique_ptr<Csr> dmtx_square;
-std::unique_ptr<Csr> dmtx_ani;
-std::unique_ptr<Csr> dmtx_l_ani;
-std::unique_ptr<Csr> dmtx_u_ani;
-std::unique_ptr<Csr> dmtx_ut_ani;
-std::unique_ptr<Csr> dmtx_l;
-std::unique_ptr<Csr> dmtx_l2;
-std::unique_ptr<ComplexCsr> dmtx_l_complex;
-std::unique_ptr<Csr> dmtx_u;
-std::unique_ptr<ComplexCsr> dmtx_u_complex;
+    std::unique_ptr<Csr> dmtx1;
+    std::unique_ptr<Csr> dmtx2;
+    std::unique_ptr<Csr> dmtx_square;
+    std::unique_ptr<Csr> dmtx_ani;
+    std::unique_ptr<Csr> dmtx_l_ani;
+    std::unique_ptr<Csr> dmtx_u_ani;
+    std::unique_ptr<Csr> dmtx_ut_ani;
+    std::unique_ptr<Csr> dmtx_l;
+    std::unique_ptr<Csr> dmtx_l2;
+    std::unique_ptr<ComplexCsr> dmtx_l_complex;
+    std::unique_ptr<Csr> dmtx_u;
+    std::unique_ptr<ComplexCsr> dmtx_u_complex;
 };  // namespace
 
 
