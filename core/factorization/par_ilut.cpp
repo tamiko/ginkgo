@@ -44,6 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ginkgo/core/matrix/csr.hpp>
 
 
+#include "core/factorization/factorization_kernels.hpp"
 #include "core/factorization/par_ilu_kernels.hpp"
 #include "core/factorization/par_ilut_kernels.hpp"
 #include "core/matrix/coo_builder.hpp"
@@ -67,8 +68,8 @@ GKO_REGISTER_OPERATION(compute_l_u_factors,
                        par_ilut_factorization::compute_l_u_factors);
 
 GKO_REGISTER_OPERATION(initialize_row_ptrs_l_u,
-                       par_ilu_factorization::initialize_row_ptrs_l_u);
-GKO_REGISTER_OPERATION(initialize_l_u, par_ilu_factorization::initialize_l_u);
+                       factorization::initialize_row_ptrs_l_u);
+GKO_REGISTER_OPERATION(initialize_l_u, factorization::initialize_l_u);
 
 GKO_REGISTER_OPERATION(csr_transpose, csr::transpose);
 GKO_REGISTER_OPERATION(convert_to_coo, csr::convert_to_coo);
@@ -273,7 +274,7 @@ void ParIlutState<ValueType, IndexType>::iterate()
     exec->run(make_add_candidates(lu.get(), system_matrix, l.get(), u.get(),
                                   l_new.get(), u_new.get()));
 
-    // update u_new_csc, l_coo, u_coo sizes and pointers
+    // update U'(CSC), L'(COO), U'(COO) sizes and pointers
     {
         auto l_nnz = l_new->get_num_stored_elements();
         auto u_nnz = u_new->get_num_stored_elements();
@@ -294,10 +295,10 @@ void ParIlutState<ValueType, IndexType>::iterate()
         u_builder.get_value_array().make_view(exec, u_nnz, u_new->get_values());
     }
 
-    // convert u_new into csc format
+    // convert U' into CSC format
     exec->run(make_csr_transpose(u_new.get(), u_new_csc.get()));
 
-    // convert l_new and u_new into COO format
+    // convert L' and U' into COO format
     exec->run(make_convert_to_coo(l_new.get(), l_coo.get()));
     exec->run(make_convert_to_coo(u_new.get(), u_coo.get()));
 
