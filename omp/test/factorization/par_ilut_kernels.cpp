@@ -50,7 +50,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ginkgo/core/matrix/dense.hpp>
 
 
-#include "core/factorization/par_ilu_kernels.hpp"
+#include "core/factorization/factorization_kernels.hpp"
 #include "core/matrix/csr_builder.hpp"
 #include "core/matrix/csr_kernels.hpp"
 #include "core/test/utils.hpp"
@@ -150,10 +150,9 @@ protected:
                 mtx_l_ani.get());
             gko::matrix::CsrBuilder<value_type, index_type> u_builder(
                 mtx_u_ani.get());
-            gko::kernels::reference::par_ilu_factorization::
-                initialize_row_ptrs_l_u(ref, mtx_ani.get(),
-                                        mtx_l_ani->get_row_ptrs(),
-                                        mtx_u_ani->get_row_ptrs());
+            gko::kernels::reference::factorization::initialize_row_ptrs_l_u(
+                ref, mtx_ani.get(), mtx_l_ani->get_row_ptrs(),
+                mtx_u_ani->get_row_ptrs());
             auto l_nnz =
                 mtx_l_ani->get_const_row_ptrs()[mtx_ani->get_size()[0]];
             auto u_nnz =
@@ -162,7 +161,7 @@ protected:
             l_builder.get_value_array().resize_and_reset(l_nnz);
             u_builder.get_col_idx_array().resize_and_reset(u_nnz);
             u_builder.get_value_array().resize_and_reset(u_nnz);
-            gko::kernels::reference::par_ilu_factorization::initialize_l_u(
+            gko::kernels::reference::factorization::initialize_l_u(
                 ref, mtx_ani.get(), mtx_l_ani.get(), mtx_u_ani.get());
             mtx_ut_ani = Csr::create(ref, mtx_ani->get_size(),
                                      mtx_u_ani->get_num_stored_elements());
