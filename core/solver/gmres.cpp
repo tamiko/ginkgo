@@ -61,22 +61,29 @@ GKO_REGISTER_OPERATION(step_2, gmres::step_2);
 
 
 }  // namespace gmres
-
-// loops_r = k * (k+1)/2 * floor(loops/krylov) + (loops%krylov+1)*(loops%krylov)/2
 // r = loops%krylov
 // k = krylov
-// Read: 4*ValueType*n + nnz*(2*IndexType + 3*ValueType) +
-//   loops * (
-//     floor(loops/krylov) * (ValueType*k + 8*ValueType*n + nnz*(2*IndexType + 3*ValueType) + (ValueType*k*(k + 1))/2) +
-//     2*ValueType + 2*ValueType*n + nnz*(2*IndexType + 2*ValueType)) +
-//   loops_r * (2*ValueType + 2*ValueType*n) + 
-//   4*ValueType*n + ValueType*r + (ValueType*r*(r + 1))/2
-// Write: ValueType*n + ValueType*(2*k + n + 1) + ValueType*(k + 2*n + 2) + 8 + 
-//   loops * (
-//     floor(loops/krylov) * (ValueType*k + 4*ValueType*n + ValueType*(k + 2*n + 2) + 8) +
-//     3*ValueType + 2*ValueType*n + ValueType*(n + 1)) +
-//   loops_r * (2*ValueType* + 2*ValueType*(n + 1)) + 
-//   2*ValueType*n + ValueType*r
+// Read: 5*ValueType*n + nnz*(2*IndexType + 2*ValueType) + 
+// loops_k * (ValueType*k + 9*ValueType*n + nnz*(2*IndexType + 2*ValueType) + (ValueType*k*(k + 1))/2) + 
+// loops * (ValueType*n + ValueType*(4*r + (2*n + 1)*(r + 1) + 7) + nnz*(2*IndexType + 2*ValueType)) +
+// (ValueType*(r^2 + 3*r + 8*n))/2
+// Write: 2*ValueType + 3*ValueType*k + 4*ValueType*n + 8 +
+// loops_k * (ValueType + 2*ValueType*k + 6*ValueType*n + 8) +
+// loops * (ValueType*(4*n + 3*r + n*r + 7)) + 
+// ValueType*(2*n + r)
+
+// Notes: loops * r should be 0 + 1 + ... + r - 1 = (r-1)* r/ 2 (loops_r)
+// Notes: loops_k is the floor(loops/r) i.e. how many does restart step activate
+// Refined: 
+// Read: ((r^2 + 3 * r) / 2 + 9 * n + 2 * nnz) * ValueType + 2 * nnz * IndexType
+// + floor(loops/k) * ((k^2 / 2 + 3 * k / 2 + 2 * nnz + 9 * n) * ValueType + 2 * nnz * IndexType)
+// + loops * ((3 * n + 8 + 2 * nnz) * ValueType + 2 * nnz * IndexType)
+// + loops_r * ((2 * n + 5) * ValueType)
+// Write: (2 + 3 * k + 6 * n + r) * ValueType + 8
+// + floor(loops/k) * ((2 * k + 6 * n + 1) * ValueType + 8)
+// + loops * ((4 * n + 7) * ValueType)
+// + loops_r * ((n + 3) * ValueType)
+
 template <typename ValueType>
 void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
 {
@@ -128,13 +135,13 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
     // b_norm = norm(b)
     // residual = dense_b
     // givens_sin = givens_cos = 0
-    // Read: (3 * ValueType + 2 * IndexType)*nnz + 2 * n * ValueType
+    // Read: (2 * ValueType + 2 * IndexType)*nnz + 3 * n * ValueType
     // Write: n * ValueType
     system_matrix_->apply(neg_one_op.get(), dense_x, one_op.get(),
                           residual.get());
     // residual = residual - Ax
     // Read: n * ValueType
-    // Write: (2 + k + 2 * n) * ValueType + 8
+    // Write: (1 + k + 2 * n) * ValueType + 8
     exec->run(gmres::make_initialize_2(
         residual.get(), residual_norm.get(), residual_norm_collection.get(),
         krylov_bases.get(), next_krylov_basis.get(), &final_iter_nums,
@@ -172,7 +179,7 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
 
         if (restart_iter == krylov_dim_) {
             // Restart
-            // Read: (k + 1) * k /2 * ValueType + k * ValueType
+            // Read: ((k + 1) * k /2 )* ValueType + k * ValueType
             // Write: k * ValueType
             exec->run(gmres::make_step_2(residual_norm_collection.get(),
                                          krylov_bases.get(), hessenberg.get(),
@@ -193,13 +200,13 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
             // Write: n * ValueType
             residual->copy_from(dense_b);
             // residual = dense_b
-            // Read: (3 * ValueType + 2 * IndexType)*nnz + 2 * n * ValueType
+            // Read: (2 * ValueType + 2 * IndexType)*nnz + 3 * n * ValueType
             // Write: n * ValueType
             system_matrix_->apply(neg_one_op.get(), dense_x, one_op.get(),
                                   residual.get());
             // residual = residual - Ax
             // Read: n * ValueType
-            // Write: (2 + k + 2 * n) * ValueType + 8
+            // Write: (1 + k + 2 * n) * ValueType + 8
             exec->run(gmres::make_initialize_2(
                 residual.get(), residual_norm.get(),
                 residual_norm_collection.get(), krylov_bases.get(),
@@ -218,6 +225,7 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
         // preconditioned_vector = get_preconditioner() * next_krylov_basis
 
         // Do Arnoldi and givens rotation
+        // (r + 2) x 1
         auto hessenberg_iter = hessenberg->create_submatrix(
             span{0, restart_iter + 2},
             span{dense_b->get_size()[1] * restart_iter,
@@ -229,24 +237,28 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
         system_matrix_->apply(preconditioned_vector.get(),
                               next_krylov_basis.get());
         // next_krylov_basis = A * preconditioned_vector
-        // Read: r * 2 * n * ValueType + 2 * r * ValueType + 2 * ValueType + n * ValueType
-        // Write: r * (1 + n) * ValueType + (1 + n) * ValueType + 2 * r * ValueType + 2 * ValueType + ValueType
+        // Read: ((2 * n + 1) * (r + 1)+4*r + 3+4) * ValueType
+        // Write: ((r + 1) * (1 + n) + 1 + n+2*r + 2+3) * ValueType
         exec->run(gmres::make_step_1(
             next_krylov_basis.get(), givens_sin.get(), givens_cos.get(),
             residual_norm.get(), residual_norm_collection.get(),
             krylov_bases.get(), hessenberg_iter.get(), b_norm.get(),
             restart_iter, &final_iter_nums, &stop_status));
-        // for i in 0:restart_iter
+        // R: (2 * n + 1) * (r + 1)
+        // W: (r + 1) * (1 + n) + 1 + n
+        // for i in 0:restart_iter(include)
         //     hessenberg(restart_iter, i) = next_krylov_basis' *
         //          krylov_bases(:, i)
         //     next_krylov_basis  -= hessenberg(restart_iter,
         //          i) * krylov_bases(:, i)
-        // end
+        // end 
         // hessenberg(restart_iter, restart_iter + 1) = norm(next_krylov_basis)
         // next_krylov_basis /= hessenberg(restart_iter, restart_iter + 1)
         // End of arnoldi
+        // R: 4*r + 3
+        // W: 2*r + 2
         // Start apply givens rotation
-        // for j in 0:restart_iter
+        // for j in 0:restart_iter(exclude)
         //     temp             =  cos(j)*hessenberg(j) +
         //                         sin(j)*hessenberg(j+1)
         //     hessenberg(j+1)  = -sin(j)*hessenberg(j) +
@@ -259,7 +271,15 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
         //                      sin(restart_iter)*hessenberg(restart_iter)
         // hessenberg(restart_iter+1) = 0
         // End apply givens rotation
-        // Calculate residual norm
+        // R: 4
+        // W: 3
+        // Calculate residual norm (i is col_idx of rhs here)
+        // residual_norm_collection(iter + 1, i) =
+        // -sin->at(iter, i) * residual_norm_collection(iter, i);
+        // residual_norm_collection(iter, i) =
+        // givens_cos(iter, i) * residual_norm_collection(iter, i);
+        // residual_norm->at(0, i) =
+        // abs(residual_norm_collection(iter + 1, i)) / b_norm(0, i);
 
         restart_iter++;
     }
@@ -268,6 +288,7 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
     auto krylov_bases_small = krylov_bases->create_submatrix(
         span{0, system_matrix_->get_size()[0]},
         span{0, dense_b->get_size()[1] * (restart_iter + 1)});
+    // r*r
     auto hessenberg_small = hessenberg->create_submatrix(
         span{0, restart_iter},
         span{0, dense_b->get_size()[1] * (restart_iter)});
