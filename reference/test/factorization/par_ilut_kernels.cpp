@@ -419,6 +419,27 @@ TYPED_TEST(ParIlut, KernelComplexThresholdFilterSomeAtThresholdUpper)
 }
 
 
+TYPED_TEST(ParIlut, KernelThresholdFilterApproxNullptrCoo)
+{
+    using Csr = typename TestFixture::Csr;
+    using Coo = typename TestFixture::Coo;
+    using value_type = typename TestFixture::value_type;
+    using index_type = typename TestFixture::index_type;
+    auto res_mtx = Csr::create(this->exec, this->mtx1->get_size());
+    auto tmp = gko::Array<value_type>{this->ref};
+    gko::remove_complex<value_type> threshold{};
+    Coo *null_coo = nullptr;
+    index_type rank{};
+
+    gko::kernels::reference::par_ilut_factorization::threshold_filter_approx(
+        this->ref, this->mtx1.get(), rank, tmp, threshold, res_mtx.get(),
+        null_coo);
+
+    GKO_ASSERT_MTX_EQ_SPARSITY(this->mtx1, res_mtx);
+    GKO_ASSERT_MTX_NEAR(this->mtx1, res_mtx, 0);
+}
+
+
 TYPED_TEST(ParIlut, KernelThresholdFilterSomeApprox1)
 {
     this->test_filter_approx(this->mtx1, 7, this->mtx1_expect_thrm2);
