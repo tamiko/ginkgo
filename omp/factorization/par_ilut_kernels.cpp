@@ -128,8 +128,10 @@ void abstract_filter(std::shared_ptr<const DefaultExecutor> exec,
     if (m_out_coo) {
         matrix::CooBuilder<ValueType, IndexType> coo_builder{m_out_coo};
         coo_builder.get_row_idx_array().resize_and_reset(new_nnz);
-        coo_builder.get_col_idx_array().make_view(exec, new_nnz, new_col_idxs);
-        coo_builder.get_value_array().make_view(exec, new_nnz, new_vals);
+        coo_builder.get_col_idx_array() =
+            Array<IndexType>::view(exec, new_nnz, new_col_idxs);
+        coo_builder.get_value_array() =
+            Array<ValueType>::view(exec, new_nnz, new_vals);
         new_row_idxs = m_out_coo->get_row_idxs();
     }
 
