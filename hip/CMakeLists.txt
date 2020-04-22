@@ -103,8 +103,8 @@ set(GINKGO_HIP_SOURCES
     base/version.hip.cpp
     components/prefix_sum.hip.cpp
     components/zero_array_kernels.hip.cpp
-    factorization/ilu_kernels.hip.cpp
     factorization/factorization_kernels.hip.cpp
+    factorization/ilu_kernels.hip.cpp
     factorization/par_ilu_kernels.hip.cpp
     matrix/coo_kernels.hip.cpp
     matrix/csr_kernels.hip.cpp
@@ -118,6 +118,7 @@ set(GINKGO_HIP_SOURCES
     preconditioner/jacobi_generate_kernel.hip.cpp
     preconditioner/jacobi_kernels.hip.cpp
     preconditioner/jacobi_simple_apply_kernel.hip.cpp
+    multigrid/amgx_pgm_kernels.hip.cpp
     solver/bicg_kernels.hip.cpp
     solver/bicgstab_kernels.hip.cpp
     solver/cg_kernels.hip.cpp

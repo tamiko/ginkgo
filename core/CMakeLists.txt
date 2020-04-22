@@ -10,8 +10,8 @@ target_sources(ginkgo
         base/mtx_io.cpp
         base/perturbation.cpp
         base/version.cpp
-        factorization/par_ilu.cpp
         factorization/ilu.cpp
+        factorization/par_ilu.cpp
         log/convergence.cpp
         log/logger.cpp
         log/record.cpp
@@ -27,6 +27,7 @@ target_sources(ginkgo
         matrix/sparsity_csr.cpp
         preconditioner/isai.cpp
         preconditioner/jacobi.cpp
+        multigrid/amgx_pgm.cpp
         solver/bicg.cpp
         solver/bicgstab.cpp
         solver/cg.cpp

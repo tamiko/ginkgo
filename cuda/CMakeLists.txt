@@ -66,8 +66,8 @@ target_sources(ginkgo_cuda
         base/version.cpp
         components/prefix_sum.cu
         components/zero_array_kernels.cu
-        factorization/ilu_kernels.cu
         factorization/factorization_kernels.cu
+        factorization/ilu_kernels.cu
         factorization/par_ilu_kernels.cu
         matrix/coo_kernels.cu
         matrix/csr_kernels.cu
@@ -81,6 +81,7 @@ target_sources(ginkgo_cuda
         preconditioner/jacobi_generate_kernel.cu
         preconditioner/jacobi_kernels.cu
         preconditioner/jacobi_simple_apply_kernel.cu
+        multigrid/amgx_pgm_kernels.cu
         solver/bicg_kernels.cu
         solver/bicgstab_kernels.cu
         solver/cg_kernels.cu
