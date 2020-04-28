@@ -65,7 +65,7 @@ GKO_REGISTER_OPERATION(step_2, gmres::step_2);
 // k = krylov
 // Read: 5*ValueType*n + nnz*(2*IndexType + 2*ValueType) + 
 // loops_k * (ValueType*k + 9*ValueType*n + nnz*(2*IndexType + 2*ValueType) + (ValueType*k*(k + 1))/2) + 
-// loops * (ValueType*n + ValueType*(4*r + (2*n + 1)*(r + 1) + 7) + nnz*(2*IndexType + 2*ValueType)) +
+// loops * (ValueType*(2*n + 4*r + (4*n + 1)*(r + 1) + 7) + ValueType*n + nnz*(2*IndexType + 2*ValueType))
 // (ValueType*(r^2 + 3*r + 8*n))/2
 // Write: 2*ValueType + 3*ValueType*k + 4*ValueType*n + 8 +
 // loops_k * (ValueType + 2*ValueType*k + 6*ValueType*n + 8) +
@@ -78,8 +78,8 @@ GKO_REGISTER_OPERATION(step_2, gmres::step_2);
 // Refined: 
 // Read: ((r^2 + 3 * r) / 2 + 9 * n + 2 * nnz) * ValueType + 2 * nnz * IndexType
 // + floor(loops/k) * ((k^2 / 2 + 3 * k / 2 + 2 * nnz + 9 * n) * ValueType + 2 * nnz * IndexType)
-// + loops * ((3 * n + 8 + 2 * nnz) * ValueType + 2 * nnz * IndexType)
-// + loops_r * ((2 * n + 5) * ValueType)
+// + loops * ((7 * n + 8 + 2 * nnz) * ValueType + 2 * nnz * IndexType)
+// + loops_r * ((4 * n + 5) * ValueType)
 // Write: (2 + 3 * k + 6 * n + r) * ValueType + 8
 // + floor(loops/k) * ((2 * k + 6 * n + 1) * ValueType + 8)
 // + loops * ((4 * n + 7) * ValueType)
@@ -238,14 +238,14 @@ void Gmres<ValueType>::apply_impl(const LinOp *b, LinOp *x) const
         system_matrix_->apply(preconditioned_vector.get(),
                               next_krylov_basis.get());
         // next_krylov_basis = A * preconditioned_vector
-        // Read: ((2 * n + 1) * (r + 1)+4*r + 3+4) * ValueType
+        // Read: ((4 * n + 1) * (r + 1) + 2 * n + 4 * r + 3+4) * ValueType
         // Write: ((r + 1) * (1 + n) + 1 + n+2*r + 2+3) * ValueType
         exec->run(gmres::make_step_1(
             next_krylov_basis.get(), givens_sin.get(), givens_cos.get(),
             residual_norm.get(), residual_norm_collection.get(),
             krylov_bases.get(), hessenberg_iter.get(), b_norm.get(),
             restart_iter, &final_iter_nums, &stop_status));
-        // R: (2 * n + 1) * (r + 1)
+        // R: (4 * n + 1) * (r + 1) + 2 * n
         // W: (r + 1) * (1 + n) + 1 + n
         // for i in 0:restart_iter(include)
         //     hessenberg(restart_iter, i) = next_krylov_basis' *
