@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
     for (auto i = 0; i < size; i++) {
         host_x->at(i, 0) = 1.;
     }
-    auto x = gko::matrix::Dense<>::create(exec);
-    auto b = gko::matrix::Dense<>::create(exec);
+    auto x = gko::matrix::Dense<ValueType>::create(exec);
+    auto b = gko::matrix::Dense<ValueType>::create(exec);
     x->copy_from(host_x.get());
     b->copy_from(host_x.get());
 
