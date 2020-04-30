@@ -107,13 +107,14 @@ int main(int argc, char *argv[])
     tol_stop->add_logger(logger);
 
     // Create solver factory
+    gko::remove_complex<ValueType> inner_reduction_factor = 1e-2;
     auto solver_gen =
         ir::build()
             .with_solver(
                 cg::build()
                     .with_criteria(
                         gko::stop::ResidualNormReduction<ValueType>::build()
-                            .with_reduction_factor(static_cast<ValueType>(1e-2))
+                            .with_reduction_factor(inner_reduction_factor)
                             .on(exec))
                     .on(exec))
             .with_criteria(gko::share(iter_stop), gko::share(tol_stop))
