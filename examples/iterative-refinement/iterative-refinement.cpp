@@ -93,11 +93,12 @@ int main(int argc, char *argv[])
 
     // copy b again
     b->copy_from(host_x.get());
-
+   gko::size_type max_iters= 10000u; 
+    gko::remove_complex<ValueType> outer_reduction_factor = 1e-12;
     auto iter_stop =
-        gko::stop::Iteration::build().with_max_iters(10000u).on(exec);
+        gko::stop::Iteration::build().with_max_iters(max_iters).on(exec);
     auto tol_stop = gko::stop::ResidualNormReduction<ValueType>::build()
-                        .with_reduction_factor(static_cast<ValueType>(1e-12))
+                        .with_reduction_factor(outer_reduction_factor)
                         .on(exec);
 
     std::shared_ptr<const gko::log::Convergence<ValueType>> logger =
